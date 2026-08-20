@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>鼓励贴生成器</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    background:#f0f2f5; color:#333; overflow:hidden; height:100vh;
+  }
+
+  .app-container { display:flex; height:100vh; width:100vw; }
+
+  /* ===== Left Panel ===== */
+  .left-panel {
+    width:300px; min-width:300px; background:#fff;
+    border-right:1px solid #e0e0e0; overflow-y:auto; padding:16px;
+    display:flex; flex-direction:column; gap:10px;
+  }
+  .left-panel h2 { font-size:18px; color:#1a1a1a; }
+  .left-panel .subtitle { font-size:12px; color:#999; margin-bottom:4px; }
+
+  .template-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+
+  .template-card {
+    cursor:pointer; border-radius:8px; overflow:hidden;
+    border:2px solid transparent; transition:all .2s; background:#f8f8f8;
+  }
+  .template-card:hover { border-color:#4a90d9; transform:translateY(-2px); box-shadow:0 4px 12px rgba(0,0,0,.1); }
+  .template-card.active { border-color:#4a90d9; box-shadow:0 0 0 2px rgba(74,144,217,.3); }
+  .template-card img { width:100%; aspect-ratio:9/16; object-fit:cover; display:block; }
+  .template-card .card-name { font-size:10px; padding:4px 6px; text-align:center; color:#666; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  /* ===== Right Area ===== */
+  .right-area { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+
+  /* Toolbar */
+  .toolbar {
+    min-height:56px; background:#fff; border-bottom:1px solid #e0e0e0;
+    display:flex; align-items:center; padding:8px 16px; gap:10px; flex-wrap:wrap;
+  }
+  .toolbar-group { display:flex; align-items:center; gap:6px; padding:0 8px; border-right:1px solid #eee; height:36px; }
+  .toolbar-group:last-child { border-right:none; margin-left:auto; }
+  .toolbar label { font-size:12px; color:#666; white-space:nowrap; }
+  .toolbar select,.toolbar input[type=color],.toolbar input[type=number] {
+    height:30px; border:1px solid #ddd; border-radius:6px; padding:0 8px; font-size:13px; background:#fff; cursor:pointer;
+  }
+  .toolbar input[type=color] { width:38px; padding:2px; }
+  .toolbar input[type=number] { width:55px; }
+  .toolbar button {
+    height:32px; padding:0 14px; border:none; border-radius:6px;
+    font-size:13px; cursor:pointer; font-weight:500; transition:all .2s;
+  }
+  .btn-primary { background:#4a90d9; color:#fff; }
+  .btn-primary:hover { background:#3a7bc8; }
+  .btn-success { background:#34a853; color:#fff; }
+  .btn-success:hover { background:#2d8f47; }
+  .btn-outline { background:#fff; color:#4a90d9; border:1px solid #4a90d9!important; }
+  .btn-outline:hover { background:#f0f7ff; }
+  .btn-edit { background:#ff6b35; color:#fff; }
+  .btn-edit:hover { background:#e55a2b; }
+
+  /* Canvas */
+  .canvas-wrapper { flex:1; overflow:auto; display:flex; align-items:center; justify-content:center; padding:20px; background:#e8e8e8; }
+  .canvas-container { position:relative; box-shadow:0 8px 32px rgba(0,0,0,.15); border-radius:4px; overflow:hidden; }
+  #bgCanvas,#editCanvas { position:absolute; top:0; left:0; }
+  #bgCanvas { z-index:1; }
+  #editCanvas { z-index:2; cursor:move; }
+
+  /* Text edit modal */
+  .modal-overlay {
+    display:none; position:fixed; top:0; left:0; right:0; bottom:0;
+    background:rgba(0,0,0,.5); z-index:100; align-items:center; justify-content:center;
+  }
+  .modal-overlay.active { display:flex; }
+  .modal {
+    background:#fff; border-radius:12px; padding:24px; width:460px; max-width:90vw;
+    box-shadow:0 12px 48px rgba(0,0,0,.2); max-height:90vh; overflow-y:auto;
+  }
+  .modal h3 { margin-bottom:16px; font-size:16px; }
+  .modal label { display:block; font-size:13px; color:#555; margin-bottom:6px; margin-top:12px; font-weight:500; }
+  .modal textarea {
+    width:100%; min-height:80px; border:1px solid #ddd; border-radius:8px;
+    padding:10px; font-size:14px; resize:vertical; font-family:inherit; outline:none;
+  }
+  .modal textarea:focus { border-color:#4a90d9; box-shadow:0 0 0 2px rgba(74,144,217,.15); }
+  .modal-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:20px; }
+  .modal-actions button { height:34px; padding:0 20px; border:none; border-radius:6px; font-size:13px; cursor:pointer; }
+  .btn-cancel { background:#f0f0f0; color:#666; }
+  .btn-confirm { background:#4a90d9; color:#fff; }
+
+  /* Preview bar */
+  .preview-bar {
+    display:none; height:40px; background:#4a90d9; color:#fff;
+    align-items:center; justify-content:center; font-size:14px; gap:12px;
+  }
+  .preview-bar.active { display:flex; }
+  .preview-bar button { background:rgba(255,255,255,.2); color:#fff; border:1px solid rgba(255,255,255,.5); padding:4px 12px; border-radius:4px; cursor:pointer; font-size:12px; }
+
+  /* Toast */
+  .toast {
+    position:fixed; bottom:40px; left:50%; transform:translateX(-50%) translateY(100px);
+    background:#333; color:#fff; padding:12px 24px; border-radius:8px;
+    font-size:14px; opacity:0; transition:all .3s; z-index:999;
+  }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  /* Error box */
+  .error-box {
+    position:fixed; bottom:40px; left:20px; background:#d93025; color:#fff;
+    padding:12px 20px; border-radius:8px; font-size:13px; z-index:999; max-width:400px;
+  }
+
+  /* Signature toggle */
+  .signature-toggle { display:flex; align-items:center; gap:6px; cursor:pointer; }
+  .signature-toggle input { cursor:pointer; }
+
+  /* ===== Responsive ===== */
+  @media (max-width:768px) {
+    .app-container { flex-direction:column; }
+    .left-panel { width:100%; min-width:100%; height:140px; min-height:140px; border-right:none; border-bottom:1px solid #e0e0e0; flex-direction:row; overflow-x:auto; overflow-y:hidden; padding:10px; gap:8px; }
+    .left-panel h2,.left-panel .subtitle { display:none; }
+    .template-grid { display:flex; grid-template-columns:none; gap:8px; }
+    .template-card { width:80px; min-width:80px; }
+    .toolbar { padding:6px 10px; gap:6px; }
+    .toolbar-group { height:30px; padding:0 4px; }
+    .toolbar select,.toolbar input[type=number] { height:26px; font-size:12px; padding:0 4px; }
+    .toolbar button { height:28px; padding:0 10px; font-size:12px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app-container">
+  <!-- Left: Template Selector -->
+  <div class="left-panel">
+    <h2>🎨 鼓励贴生成器</h2>
+    <div class="subtitle">选择模板 → 编辑文字 → 一键生成</div>
+    <div class="template-grid" id="templateGrid"></div>
+  </div>
+
+  <!-- Right: Editor -->
+  <div class="right-area">
+    <div class="preview-bar" id="previewBar">
+      <span>📱 预览模式 — 文字已锁定</span>
+      <button onclick="exitPreview()">退出预览</button>
+      <button onclick="generateImage()">💾 保存图片</button>
+    </div>
+
+    <div class="toolbar" id="toolbar">
+      <div class="toolbar-group">
+        <label>正文字体</label>
+        <select id="fontFamily">
+          <option value="Microsoft YaHei">微软雅黑</option>
+          <option value="SimHei">黑体</option>
+          <option value="KaiTi">楷体</option>
+          <option value="SimSun">宋体</option>
+          <option value="FangSong">仿宋</option>
+          <option value="STXingkai">华文行楷</option>
+          <option value="TsangerShuYuanT">仓耳舒圆体</option>
+          <option value="Arial">Arial</option>
+        </select>
+      </div>
+      <div class="toolbar-group">
+        <label>正文字号</label>
+        <select id="fontSize">
+          <option value="14">14px</option>
+          <option value="16">16px</option>
+          <option value="18">18px</option>
+          <option value="20" selected>20px</option>
+          <option value="24">24px</option>
+          <option value="28">28px</option>
+          <option value="32">32px</option>
+          <option value="36">36px</option>
+          <option value="40">40px</option>
+          <option value="48">48px</option>
+        </select>
+      </div>
+      <div class="toolbar-group">
+        <label>正文颜色</label>
+        <input type="color" id="fontColor" value="#333333">
+      </div>
+      <div class="toolbar-group">
+        <label>对齐</label>
+        <select id="textAlign">
+          <option value="center" selected>居中</option>
+          <option value="left">左对齐</option>
+          <option value="right">右对齐</option>
+        </select>
+      </div>
+      <div class="toolbar-group">
+        <label>行高</label>
+        <input type="number" id="lineHeight" value="1.6" min="1" max="3" step="0.1">
+      </div>
+      <div class="toolbar-group">
+        <label>加粗</label>
+        <select id="fontWeight">
+          <option value="normal" selected>普通</option>
+          <option value="bold">加粗</option>
+        </select>
+      </div>
+      <div class="toolbar-group">
+        <label class="signature-toggle">
+          <input type="checkbox" id="sigEnabled" checked> 落款
+        </label>
+      </div>
+      <div class="toolbar-group">
+        <label>落款字号</label>
+        <select id="sigFontSize">
+          <option value="same" selected>同正文</option>
+          <option value="12">12px</option>
+          <option value="14">14px</option>
+          <option value="16">16px</option>
+          <option value="18">18px</option>
+          <option value="20">20px</option>
+          <option value="24">24px</option>
+        </select>
+      </div>
+      <div class="toolbar-group">
+        <button class="btn-edit" onclick="openTextEditor()">✏️ 编辑文字</button>
+      </div>
+      <div class="toolbar-group">
+        <button class="btn-outline" onclick="togglePreview()">👁 预览</button>
+        <button class="btn-success" onclick="generateImage()">💾 生成图片</button>
+      </div>
+    </div>
+
+    <div class="canvas-wrapper" id="canvasWrapper">
+      <div class="canvas-container" id="canvasContainer">
+        <canvas id="bgCanvas"></canvas>
+        <canvas id="editCanvas"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Text Edit Modal -->
+<div class="modal-overlay" id="textModal">
+  <div class="modal">
+    <h3>✏️ 编辑文字内容</h3>
+    <label>中文正文（多行自动换行）</label>
+    <textarea id="editTextZh" placeholder="亲爱的XXX：&#10;&#10;每一次尝试都有光芒！&#10;你是最棒的！"></textarea>
+    <label>英文正文（可选，多行自动换行）</label>
+    <textarea id="editTextEn" placeholder="Dear XXX,&#10;&#10;Every try has its light!" style="min-height:60px;"></textarea>
+    <label>落款文字</label>
+    <textarea id="editTextSig" placeholder="永远爱你的妈妈" style="min-height:40px;"></textarea>
+    <label>日期</label>
+    <textarea id="editTextDate" placeholder="2026.08.20" style="min-height:30px;"></textarea>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeTextEditor()">取消</button>
+      <button class="btn-confirm" onclick="saveTextEditor()">确认</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============ 自动探测网站根路径 ============
+function getBasePath(){
+  const p = window.location.pathname;
+  const m = p.match(/^(\/[^/]+\/)/);
+  return m ? m[1] : '/';
+}
+const BASE = getBasePath();
+
+// ============ TEMPLATES ============
+const TEMPLATES = [
+  {"id":"01_wizard_green","name":"绿色星空小巫师","file":BASE+"images/01_wizard_green.png","width":1600,"height":2848,"themeColor":"#2d5a27","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":603,"h":748}},
+  {"id":"02_wizard_warm","name":"暖黄魔法小巫师","file":BASE+"images/02_wizard_warm.png","width":1600,"height":2848,"themeColor":"#8b6914","mascotCorner":"left","avoidArea":{"x":6,"y":2083,"w":608,"h":609}},
+  {"id":"03_wizard_pink","name":"粉色樱花小巫师","file":BASE+"images/03_wizard_pink.png","width":1600,"height":2848,"themeColor":"#c44569","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":615,"h":748}},
+  {"id":"04_wizard_blue","name":"蓝天雨滴小巫师","file":BASE+"images/04_wizard_blue.png","width":1600,"height":2848,"themeColor":"#2d6a9f","mascotCorner":"left","avoidArea":{"x":36,"y":2083,"w":578,"h":600}},
+  {"id":"05_wizard_warm_orange","name":"暖橙阳光小巫师","file":BASE+"images/05_wizard_warm_orange.png","width":1600,"height":2848,"themeColor":"#b8560e","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":395,"h":573}},
+  {"id":"06_wizard_purple","name":"梦幻紫色小巫师","file":BASE+"images/06_wizard_purple.png","width":1600,"height":2848,"themeColor":"#5b4a9d","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":615,"h":765}},
+  {"id":"07_wizard_gold","name":"金色荣耀小巫师","file":BASE+"images/07_wizard_gold.png","width":1600,"height":2848,"themeColor":"#8b6914","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":615,"h":765}},
+  {"id":"08_wizard_teal","name":"青绿海洋小巫师","file":BASE+"images/08_wizard_teal.png","width":1600,"height":2848,"themeColor":"#2a7a6b","mascotCorner":"left","avoidArea":{"x":46,"y":2083,"w":568,"h":550}},
+  {"id":"09_wizard_dreamy","name":"梦幻紫粉小巫师","file":BASE+"images/09_wizard_dreamy.png","width":1600,"height":2848,"themeColor":"#6b3fa0","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":615,"h":763}},
+  {"id":"10_wizard_pink_love","name":"粉色爱心小巫师","file":BASE+"images/10_wizard_pink_love.png","width":1600,"height":2848,"themeColor":"#c44569","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":593,"h":738}},
+  {"id":"11_basketball_blue","name":"蓝天篮球小勇士","file":BASE+"images/11_basketball_blue.png","width":1600,"height":2848,"themeColor":"#2d5a9f","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":615,"h":587}},
+  {"id":"12_wizard_pink_frame","name":"粉色边框小巫师","file":BASE+"images/12_wizard_pink_frame.png","width":1600,"height":2848,"themeColor":"#c44569","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":593,"h":738}},
+  {"id":"13_wizard_red_gold","name":"红金庆典小巫师","file":BASE+"images/13_wizard_red_gold.png","width":1600,"height":2848,"themeColor":"#8b1a1a","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":615,"h":765}},
+  {"id":"14_wizard_certificate","name":"金色奖状小巫师","file":BASE+"images/14_wizard_certificate.png","width":1600,"height":2848,"themeColor":"#b8860b","mascotCorner":"left","avoidArea":{"x":0,"y":2083,"w":614,"h":765}},
+  {"id":"15_wizard_light_blue","name":"浅蓝思考小巫师","file":BASE+"images/15_wizard_light_blue.png","width":1600,"height":2848,"themeColor":"#3a7ca5","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":610,"h":748}},
+  {"id":"16_wizard_rain","name":"雨滴探索小巫师","file":BASE+"images/16_wizard_rain.png","width":1600,"height":2848,"themeColor":"#4a90b8","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":615,"h":748}},
+  {"id":"17_basketball_blue_sky","name":"蓝天白云小球员","file":BASE+"images/17_basketball_blue_sky.png","width":1600,"height":2848,"themeColor":"#e63946","mascotCorner":"left","avoidArea":{"x":0,"y":2083,"w":614,"h":641}},
+  {"id":"18_basketball_gold","name":"金色荣耀小球员","file":BASE+"images/18_basketball_gold.png","width":1600,"height":2848,"themeColor":"#e63946","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":615,"h":765}},
+  {"id":"19_basketball_green","name":"绿色成长小球员","file":BASE+"images/19_basketball_green.png","width":1600,"height":2848,"themeColor":"#2d8b4e","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":615,"h":622}},
+  {"id":"20_basketball_pink","name":"粉色甜蜜小球员","file":BASE+"images/20_basketball_pink.png","width":1600,"height":2848,"themeColor":"#e63946","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":584,"h":658}},
+  {"id":"21_note_blue_stars","name":"蓝色星空便签","file":BASE+"images/21_note_blue_stars.png","width":562,"height":1000,"themeColor":"#3a7ca5"},
+  {"id":"22_basketball_red_warm","name":"红火热情小球员","file":BASE+"images/22_basketball_red_warm.png","width":1600,"height":2848,"themeColor":"#e63946","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":615,"h":765}},
+  {"id":"23_basketball_yellow","name":"暖黄收获小球员","file":BASE+"images/23_basketball_yellow.png","width":1600,"height":2848,"themeColor":"#e63946","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":615,"h":614}},
+  {"id":"24_romantic_pink","name":"粉色浪漫爱心","file":BASE+"images/24_romantic_pink.png","width":562,"height":1000,"themeColor":"#d63384"}
+];
+
+// ============ STATE ============
+let currentTemplate = null;
+let canvas, ctx, bgCanvas, bgCtx, container;
+let isDragging=false, dragStartX, dragStartY;
+let textBox={x:80,y:80,w:400,h:200};
+let sigBox={x:0,y:0,w:200,h:60}; // 落款框，初始化在右下角
+let isResizing=false, resizeHandle=null;
+let draggingBox=null; // 'text' or 'sig'
+let previewMode=false, bgImage=null;
+let userTextZh="亲爱的XXX：\n\n每一次尝试都有光芒！", userTextEn="", userSig="永远爱你的妈妈", userDate="";
+let bgScale=1, bgOffsetX=0, bgOffsetY=0; // 背景图在画布上的缩放和偏移
+
+// ============ INIT ============
+function init(){
+  canvas=document.getElementById('editCanvas');
+  ctx=canvas.getContext('2d');
+  bgCanvas=document.getElementById('bgCanvas');
+  bgCtx=bgCanvas.getContext('2d');
+  container=document.getElementById('canvasContainer');
+
+  // 设置默认日期为今天
+  const today = new Date();
+  const dateStr = today.getFullYear() + '.' + String(today.getMonth()+1).padStart(2,'0') + '.' + String(today.getDate()).padStart(2,'0');
+  userDate = dateStr;
+  document.getElementById('editTextDate').value = dateStr;
+
+  renderTemplateGrid();
+  if(TEMPLATES.length>0) loadTemplate(TEMPLATES[0]);
+  setupCanvasEvents();
+  setupToolbarEvents();
+  console.log('[init] BASE path =', BASE);
+}
+
+// ============ ERROR HELPER ============
+function showError(msg){
+  console.error(msg);
+  let box = document.getElementById('errorBox');
+  if(!box){
+    box = document.createElement('div');
+    box.id = 'errorBox';
+    box.className = 'error-box';
+    document.body.appendChild(box);
+  }
+  box.textContent = msg;
+}
+
+// ============ RENDER GRID ============
+function renderTemplateGrid(){
+  const grid=document.getElementById('templateGrid');
+  grid.innerHTML='';
+  TEMPLATES.forEach((tpl,idx)=>{
+    const card=document.createElement('div');
+    card.className='template-card'+(idx===0?' active':'');
+    card.innerHTML=`<img src="${tpl.file}" alt="${tpl.name}" loading="lazy" onerror="showError('缩略图加载失败: ${tpl.file}')">`
+      + `<div class="card-name">${tpl.name}</div>`;
+    card.onclick=()=>{
+      document.querySelectorAll('.template-card').forEach(c=>c.classList.remove('active'));
+      card.classList.add('active');
+      loadTemplate(tpl);
+    };
+    grid.appendChild(card);
+  });
+}
+
+// ============ LOAD TEMPLATE ============
+function loadTemplate(tpl){
+  currentTemplate=tpl;
+  const img=new Image();
+  img.crossOrigin='anonymous';
+  img.onload=()=>{
+    bgImage=img;
+
+    // 画布显示尺寸：根据窗口自适应，但保持图片比例
+    const wrapper = document.getElementById('canvasWrapper');
+    const maxW = wrapper.clientWidth - 40;
+    const maxH = wrapper.clientHeight - 40;
+    const scale = Math.min(maxW / tpl.width, maxH / tpl.height, 1);
+    const displayW = tpl.width * scale;
+    const displayH = tpl.height * scale;
+
+    container.style.width=displayW+'px';
+    container.style.height=displayH+'px';
+    bgCanvas.width=tpl.width; bgCanvas.height=tpl.height;
+    canvas.width=tpl.width; canvas.height=tpl.height;
+
+    // 绘制背景图（铺满画布，保持比例）
+    bgCtx.clearRect(0,0,tpl.width,tpl.height);
+    bgCtx.drawImage(img,0,0,tpl.width,tpl.height);
+
+    // 计算背景图在画布上的实际显示参数（用于坐标映射）
+    bgScale = scale;
+    bgOffsetX = 0;
+    bgOffsetY = 0;
+
+    // 初始化文本框：在图片上半部分居中
+    const margin=80;
+    let safeBottom=tpl.height-margin;
+    if(tpl.avoidArea) safeBottom=Math.min(safeBottom,tpl.avoidArea.y-40);
+    textBox={x:margin, y:margin+40, w:tpl.width-2*margin, h:Math.max(200, safeBottom-margin-100)};
+
+    // 初始化落款框：右下角，避开 avoidArea
+    const sigW = 280, sigH = 70;
+    let sigX = tpl.width - sigW - margin;
+    let sigY = tpl.height - sigH - margin - 20;
+    // 如果右下角在 avoidArea 里，往上移
+    if(tpl.avoidArea){
+      const a=tpl.avoidArea;
+      if(sigX < a.x+a.w && sigY+a.h > a.y && sigY < a.y+a.h){
+        sigY = a.y - sigH - 20;
+      }
+    }
+    sigBox={x:sigX, y:sigY, w:sigW, h:sigH};
+
+    redraw();
+  };
+  img.onerror=()=>{
+    showError('图片加载失败: '+tpl.file);
+    console.error('Image failed:', tpl.file);
+  };
+  img.src=tpl.file;
+}
+
+// ============ REDRAW ============
+function redraw(){
+  if(!currentTemplate) return;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(previewMode){
+    drawAllText();
+    return;
+  }
+  // 文本框虚线
+  ctx.strokeStyle='#4a90d9'; ctx.lineWidth=2; ctx.setLineDash([8,4]);
+  ctx.strokeRect(textBox.x,textBox.y,textBox.w,textBox.h);
+  ctx.setLineDash([]);
+  // 文本框手柄
+  ctx.fillStyle='#4a90d9';
+  getResizeHandles('text').forEach(h=>{ ctx.beginPath(); ctx.arc(h.x,h.y,8,0,Math.PI*2); ctx.fill(); });
+
+  // 落款框（如果启用）
+  if(document.getElementById('sigEnabled').checked){
+    ctx.strokeStyle='#e63946'; ctx.lineWidth=2; ctx.setLineDash([5,3]);
+    ctx.strokeRect(sigBox.x,sigBox.y,sigBox.w,sigBox.h);
+    ctx.setLineDash([]);
+    ctx.fillStyle='#e63946';
+    getResizeHandles('sig').forEach(h=>{ ctx.beginPath(); ctx.arc(h.x,h.y,6,0,Math.PI*2); ctx.fill(); });
+  }
+
+  drawAllText();
+}
+
+function drawAllText(){
+  if(!currentTemplate) return;
+  const ff=document.getElementById('fontFamily').value;
+  const fs=parseInt(document.getElementById('fontSize').value);
+  const fc=document.getElementById('fontColor').value;
+  const ta=document.getElementById('textAlign').value;
+  const lh=parseFloat(document.getElementById('lineHeight').value);
+  const fw=document.getElementById('fontWeight').value;
+
+  // 中文正文（支持多行换行）
+  const zhText = userTextZh || '';
+  if(zhText){
+    ctx.font=`${fw} ${fs}px ${ff}`;
+    ctx.fillStyle=fc; ctx.textAlign=ta; ctx.textBaseline='top';
+    const lines = wrapText(ctx, zhText, textBox.w - 20);
+    const startY = textBox.y + 10;
+    const lineH = fs * lh;
+    lines.forEach((line,i)=>{
+      let x = ta==='center' ? textBox.x+textBox.w/2 : ta==='right' ? textBox.x+textBox.w-10 : textBox.x+10;
+      ctx.fillText(line, x, startY + i*lineH);
+    });
+
+    // 英文正文
+    const enText = userTextEn || '';
+    if(enText){
+      ctx.font=`${fw} ${Math.round(fs*0.7)}px ${ff}`;
+      const enLines = wrapText(ctx, enText, textBox.w - 20);
+      const enStartY = startY + lines.length * lineH + 8;
+      enLines.forEach((line,i)=>{
+        let x = ta==='center' ? textBox.x+textBox.w/2 : ta==='right' ? textBox.x+textBox.w-10 : textBox.x+10;
+        ctx.fillText(line, x, enStartY + i*lineH*0.8);
+      });
+    }
+  }
+
+  // 落款 + 日期
+  if(document.getElementById('sigEnabled').checked){
+    const sigFs = getSigFontSize(fs);
+    ctx.font=`${fw} ${sigFs}px ${ff}`;
+    ctx.fillStyle=fc; ctx.textAlign='right'; ctx.textBaseline='top';
+    const sigText = userSig || '';
+    const dateText = userDate || '';
+    const sigX = sigBox.x + sigBox.w - 10;
+    const sigY = sigBox.y + 8;
+    if(sigText) ctx.fillText(sigText, sigX, sigY);
+    if(dateText) ctx.fillText(dateText, sigX, sigY + sigFs * 1.4);
+  }
+}
+
+function getSigFontSize(bodyFs){
+  const sel = document.getElementById('sigFontSize').value;
+  if(sel === 'same') return bodyFs;
+  return parseInt(sel);
+}
+
+// ============ WRAP TEXT（支持 \n 换行）============
+function wrapText(context, text, maxWidth){
+  // 先按换行符分割
+  const paragraphs = text.split('\n');
+  const allLines = [];
+  for(const para of paragraphs){
+    if(para === ''){
+      allLines.push(''); // 空行保留
+      continue;
+    }
+    const chars = para.split('');
+    let cur = '';
+    for(let i=0; i<chars.length; i++){
+      const test = cur + chars[i];
+      if(context.measureText(test).width > maxWidth && cur !== ''){
+        allLines.push(cur);
+        cur = chars[i];
+      } else {
+        cur = test;
+      }
+    }
+    if(cur) allLines.push(cur);
+  }
+  return allLines;
+}
+
+// ============ AVOID ZONE ============
+function isInAvoidZone(x,y,w,h){
+  if(!currentTemplate||!currentTemplate.avoidArea) return false;
+  const a=currentTemplate.avoidArea;
+  return !(x+w<a.x||x>a.x+a.w||y+h<a.y||y>a.y+a.h);
+}
+function clampTextBox(box, isSig){
+  if(!currentTemplate) return;
+  const tpl=currentTemplate;
+  box.x=Math.max(10,Math.min(box.x,tpl.width-box.w-10));
+  box.y=Math.max(10,Math.min(box.y,tpl.height-box.h-10));
+  box.w=Math.max(isSig?100:100,Math.min(box.w,tpl.width-20));
+  box.h=Math.max(isSig?30:50,Math.min(box.h,tpl.height-20));
+  if(!isSig && tpl.avoidArea){
+    const a=tpl.avoidArea;
+    if(isInAvoidZone(box.x,box.y,box.w,box.h))
+      box.y=Math.min(box.y,a.y-box.h-10);
+  }
+}
+
+// ============ RESIZE HANDLES ============
+function getResizeHandles(boxType){
+  const box = boxType==='sig' ? sigBox : textBox;
+  return [
+    {x:box.x,y:box.y,cursor:'nw-resize',type:'nw'},
+    {x:box.x+box.w/2,y:box.y,cursor:'n-resize',type:'n'},
+    {x:box.x+box.w,y:box.y,cursor:'ne-resize',type:'ne'},
+    {x:box.x+box.w,y:box.y+box.h/2,cursor:'e-resize',type:'e'},
+    {x:box.x+box.w,y:box.y+box.h,cursor:'se-resize',type:'se'},
+    {x:box.x+box.w/2,y:box.y+box.h,cursor:'s-resize',type:'s'},
+    {x:box.x,y:box.y+box.h,cursor:'sw-resize',type:'sw'},
+    {x:box.x,y:box.y+box.h/2,cursor:'w-resize',type:'w'},
+  ];
+}
+function getHandleAt(x,y,boxType){
+  for(const h of getResizeHandles(boxType)) if(Math.abs(x-h.x)<14&&Math.abs(y-h.y)<14) return h;
+  return null;
+}
+
+// ============ MOUSE EVENTS ============
+function setupCanvasEvents(){
+  canvas.addEventListener('mousedown',onMouseDown);
+  canvas.addEventListener('mousemove',onMouseMove);
+  canvas.addEventListener('mouseup',onMouseUp);
+  canvas.addEventListener('mouseleave',onMouseUp);
+  canvas.addEventListener('touchstart',onTouchStart,{passive:false});
+  canvas.addEventListener('touchmove',onTouchMove,{passive:false});
+  canvas.addEventListener('touchend',onTouchEnd);
+}
+function getCanvasPoint(e){
+  const r=canvas.getBoundingClientRect();
+  return {x:(e.clientX-r.left)*(canvas.width/r.width),y:(e.clientY-r.top)*(canvas.height/r.height)};
+}
+function onMouseDown(e){
+  if(previewMode) return;
+  const pt=getCanvasPoint(e);
+
+  // 检查是否点中落款框的手柄
+  if(document.getElementById('sigEnabled').checked){
+    const h=getHandleAt(pt.x,pt.y,'sig');
+    if(h){ isResizing=true; resizeHandle=h; dragStartX=pt.x; dragStartY=pt.y; draggingBox='sig'; return; }
+    // 检查是否点中落款框内部（拖动）
+    if(pt.x>=sigBox.x&&pt.x<=sigBox.x+sigBox.w&&pt.y>=sigBox.y&&pt.y<=sigBox.y+sigBox.h){
+      isDragging=true; dragStartX=pt.x-sigBox.x; dragStartY=pt.y-sigBox.y; draggingBox='sig'; canvas.style.cursor='grabbing'; return;
+    }
+  }
+
+  // 检查是否点中文本框的手柄
+  const h=getHandleAt(pt.x,pt.y,'text');
+  if(h){ isResizing=true; resizeHandle=h; dragStartX=pt.x; dragStartY=pt.y; draggingBox='text'; return; }
+  // 检查是否点中文本框内部
+  if(pt.x>=textBox.x&&pt.x<=textBox.x+textBox.w&&pt.y>=textBox.y&&pt.y<=textBox.y+textBox.h){
+    isDragging=true; dragStartX=pt.x-textBox.x; dragStartY=pt.y-textBox.y; draggingBox='text'; canvas.style.cursor='grabbing'; return;
+  }
+}
+function onMouseMove(e){
+  if(previewMode) return;
+  const pt=getCanvasPoint(e);
+
+  if(isResizing&&resizeHandle){
+    const dx=pt.x-dragStartX, dy=pt.y-dragStartY;
+    const box = draggingBox==='sig' ? sigBox : textBox;
+    let n={...box};
+    switch(resizeHandle.type){
+      case 'nw':n.x+=dx;n.y+=dy;n.w-=dx;n.h-=dy;break;
+      case 'n':n.y+=dy;n.h-=dy;break;
+      case 'ne':n.y+=dy;n.w+=dx;n.h-=dy;break;
+      case 'e':n.w+=dx;break;
+      case 'se':n.w+=dx;n.h+=dy;break;
+      case 's':n.h+=dy;break;
+      case 'sw':n.x+=dx;n.w-=dx;n.h+=dy;break;
+      case 'w':n.x+=dx;n.w-=dx;break;
+    }
+    if(n.w>80&&n.h>30){ 
+      if(draggingBox==='sig'){ sigBox=n; } else { textBox=n; }
+      dragStartX=pt.x; dragStartY=pt.y; 
+      clampTextBox(draggingBox==='sig'?sigBox:textBox, draggingBox==='sig');
+      redraw(); 
+    }
+    return;
+  }
+  if(isDragging){
+    if(draggingBox==='sig'){ sigBox.x=pt.x-dragStartX; sigBox.y=pt.y-dragStartY; clampTextBox(sigBox,true); }
+    else { textBox.x=pt.x-dragStartX; textBox.y=pt.y-dragStartY; clampTextBox(textBox,false); }
+    redraw(); return;
+  }
+  // hover cursor
+  const onSig = document.getElementById('sigEnabled').checked && pt.x>=sigBox.x&&pt.x<=sigBox.x+sigBox.w&&pt.y>=sigBox.y&&pt.y<=sigBox.y+sigBox.h;
+  const onText = pt.x>=textBox.x&&pt.x<=textBox.x+textBox.w&&pt.y>=textBox.y&&pt.y<=textBox.y+textBox.h;
+  const h = getHandleAt(pt.x,pt.y, onSig?'sig':'text');
+  canvas.style.cursor = h ? h.cursor : (onSig||onText) ? 'move' : 'default';
+}
+function onMouseUp(){ isDragging=false; isResizing=false; resizeHandle=null; draggingBox=null; canvas.style.cursor='move'; }
+
+function onTouchStart(e){ e.preventDefault(); if(e.touches.length===1) onMouseDown({clientX:e.touches[0].clientX,clientY:e.touches[0].clientY}); }
+function onTouchMove(e){ e.preventDefault(); if(e.touches.length===1) onMouseMove({clientX:e.touches[0].clientX,clientY:e.touches[0].clientY}); }
+function onTouchEnd(e){ e.preventDefault(); onMouseUp(); }
+
+// ============ TOOLBAR ============
+function setupToolbarEvents(){
+  ['fontFamily','fontSize','fontColor','textAlign','lineHeight','fontWeight','sigEnabled','sigFontSize'].forEach(id=>{
+    document.getElementById(id).addEventListener('change',redraw);
+    document.getElementById(id).addEventListener('input',redraw);
+  });
+}
+
+// ============ TEXT EDITOR MODAL ============
+function openTextEditor(){
+  document.getElementById('editTextZh').value = userTextZh;
+  document.getElementById('editTextEn').value = userTextEn;
+  document.getElementById('editTextSig').value = userSig;
+  document.getElementById('editTextDate').value = userDate;
+  document.getElementById('textModal').classList.add('active');
+  setTimeout(()=>document.getElementById('editTextZh').focus(),100);
+}
+function closeTextEditor(){ document.getElementById('textModal').classList.remove('active'); }
+function saveTextEditor(){
+  userTextZh = document.getElementById('editTextZh').value;
+  userTextEn = document.getElementById('editTextEn').value.trim();
+  userSig = document.getElementById('editTextSig').value.trim();
+  userDate = document.getElementById('editTextDate').value.trim();
+  closeTextEditor();
+  redraw();
+  showToast('✅ 文字已更新');
+}
+
+// ============ PREVIEW ============
+function togglePreview(){
+  previewMode=!previewMode;
+  const bar=document.getElementById('previewBar');
+  previewMode?bar.classList.add('active'):bar.classList.remove('active');
+  showToast(previewMode?'预览模式 — 文字已锁定':'已退出预览');
+  redraw();
+}
+function exitPreview(){ previewMode=false; document.getElementById('previewBar').classList.remove('active'); redraw(); }
+
+// ============ GENERATE IMAGE ============
+function generateImage(){
+  if(!currentTemplate||!bgImage) return;
+  const out=document.createElement('canvas');
+  out.width=currentTemplate.width; out.height=currentTemplate.height;
+  const octx=out.getContext('2d');
+  octx.drawImage(bgImage,0,0);
+
+  const ff=document.getElementById('fontFamily').value;
+  const fs=parseInt(document.getElementById('fontSize').value);
+  const fc=document.getElementById('fontColor').value;
+  const ta=document.getElementById('textAlign').value;
+  const lh=parseFloat(document.getElementById('lineHeight').value);
+  const fw=document.getElementById('fontWeight').value;
+
+  // 中文正文
+  octx.font=`${fw} ${fs}px ${ff}`;
+  octx.fillStyle=fc; octx.textAlign=ta; octx.textBaseline='top';
+  const lines=wrapText(octx,userTextZh||'',textBox.w-20);
+  const startY=textBox.y+10;
+  const lineH=fs*lh;
+
+  // 自动缩小字号适配
+  let afs=fs, alines=lines;
+  while(startY+alines.length*lineH>textBox.y+textBox.h-10&&afs>10){ afs--; octx.font=`${fw} ${afs}px ${ff}`; alines=wrapText(octx,userTextZh||'',textBox.w-20); }
+  alines.forEach((line,i)=>{ let x=ta==='center'?textBox.x+textBox.w/2:ta==='right'?textBox.x+textBox.w-10:textBox.x+10; octx.fillText(line,x,startY+i*afs*lh); });
+
+  // 英文正文
+  const enText=userTextEn||'';
+  if(enText){
+    octx.font=`${fw} ${Math.round(afs*0.7)}px ${ff}`;
+    const enY=startY+alines.length*afs*lh+8;
+    wrapText(octx,enText,textBox.w-20).forEach((line,i)=>{ let x=ta==='center'?textBox.x+textBox.w/2:ta==='right'?textBox.x+textBox.w-10:textBox.x+10; octx.fillText(line,x,enY+i*afs*lh*0.8); });
+  }
+
+  // 落款 + 日期
+  if(document.getElementById('sigEnabled').checked){
+    const sigFs = getSigFontSize(fs);
+    octx.font=`${fw} ${sigFs}px ${ff}`;
+    octx.fillStyle=fc; octx.textAlign='right'; octx.textBaseline='top';
+    const sigX = sigBox.x + sigBox.w - 10;
+    if(userSig) octx.fillText(userSig, sigX, sigBox.y + 8);
+    if(userDate) octx.fillText(userDate, sigX, sigBox.y + 8 + sigFs * 1.4);
+  }
+
+  const link=document.createElement('a');
+  link.download=`鼓励贴_${currentTemplate.name}_${Date.now()}.png`;
+  link.href=out.toDataURL('image/png');
+  link.click();
+  showToast('✅ 图片已生成并下载！');
+}
+
+// ============ TOAST ============
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+// ============ KEYBOARD ============
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){ if(previewMode)exitPreview(); closeTextEditor(); }
+  if(e.key==='p'||e.key==='P') togglePreview();
+  if((e.key==='s'||e.key==='S')&&(e.ctrlKey||e.metaKey)){ e.preventDefault(); generateImage(); }
+  if(e.key==='e'||e.key==='E') openTextEditor();
+});
+
+// ============ START ============
+window.addEventListener('DOMContentLoaded',init);
+</script>
+</body>
+</html>
