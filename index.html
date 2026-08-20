@@ -60,8 +60,6 @@
   .btn-success:hover { background:#2d8f47; }
   .btn-outline { background:#fff; color:#4a90d9; border:1px solid #4a90d9!important; }
   .btn-outline:hover { background:#f0f7ff; }
-
-  /* Edit text button */
   .btn-edit { background:#ff6b35; color:#fff; }
   .btn-edit:hover { background:#e55a2b; }
 
@@ -109,6 +107,12 @@
     font-size:14px; opacity:0; transition:all .3s; z-index:999;
   }
   .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  /* Error box */
+  .error-box {
+    position:fixed; bottom:40px; left:20px; background:#d93025; color:#fff;
+    padding:12px 20px; border-radius:8px; font-size:13px; z-index:999; max-width:400px;
+  }
 
   /* ===== Responsive ===== */
   @media (max-width:768px) {
@@ -228,9 +232,45 @@
 
 <div class="toast" id="toast"></div>
 
+<!-- ===== 第1段结束，下面是第2段 ===== -->
+ <!-- ===== 第2段开始，接在第1段后面 ===== -->
 <script>
+// ============ 自动探测网站根路径 ============
+function getBasePath(){
+  const p = window.location.pathname;
+  // 匹配 "/仓库名/" 这种格式
+  const m = p.match(/^(\/[^/]+\/)/);
+  return m ? m[1] : '/';
+}
+const BASE = getBasePath();
+
 // ============ TEMPLATES ============
-const TEMPLATES = [{"id": "01_wizard_green", "name": "绿色星空小巫师", "file": "images/01_wizard_green.png", "width": 1600, "height": 2848, "defaultText": "每一次尝试都有光芒", "defaultTextEn": "Every try has its light.", "themeColor": "#2d5a27", "mascotCorner": "right", "avoidArea": {"x": 985, "y": 2083, "w": 603, "h": 748}}, {"id": "02_wizard_warm", "name": "暖黄魔法小巫师", "file": "images/02_wizard_warm.png", "width": 1600, "height": 2848, "defaultText": "相信自己，你也有光", "defaultTextEn": "Believe in your own light.", "themeColor": "#8b6914", "mascotCorner": "left", "avoidArea": {"x": 6, "y": 2083, "w": 608, "h": 609}}, {"id": "03_wizard_pink", "name": "粉色樱花小巫师", "file": "images/03_wizard_pink.png", "width": 1600, "height": 2848, "defaultText": "今天的你也很闪亮", "defaultTextEn": "Today you shine bright too.", "themeColor": "#c44569", "mascotCorner": "right", "avoidArea": {"x": 985, "y": 2083, "w": 615, "h": 748}}, {"id": "04_wizard_blue", "name": "蓝天雨滴小巫师", "file": "images/04_wizard_blue.png", "width": 1600, "height": 2848, "defaultText": "勇敢说，勇敢做", "defaultTextEn": "Speak bravely, act bravely.", "themeColor": "#2d6a9f", "mascotCorner": "left", "avoidArea": {"x": 36, "y": 2083, "w": 578, "h": 600}}, {"id": "05_wizard_warm_orange", "name": "暖橙阳光小巫师", "file": "images/05_wizard_warm_orange.png", "width": 1600, "height": 2848, "defaultText": "慢慢走，也能到达", "defaultTextEn": "Walk slowly, you will arrive.", "themeColor": "#b8560e", "mascotCorner": "right", "avoidArea": {"x": 985, "y": 2083, "w": 395, "h": 573}}, {"id": "06_wizard_purple", "name": "梦幻紫色小巫师", "file": "images/06_wizard_purple.png", "width": 1600, "height": 2848, "defaultText": "把困难变成小星星", "defaultTextEn": "Turn difficulties into little stars.", "themeColor": "#5b4a9d", "mascotCorner": "right", "avoidArea": {"x": 985, "y": 2083, "w": 615, "h": 765}}, {"id": "07_wizard_gold", "name": "金色荣耀小巫师", "file": "images/07_wizard_gold.png", "width": 1600, "height": 2848, "defaultText": "认真的你自带光芒", "defaultTextEn": "Your effort carries its own light.", "themeColor": "#8b6914", "mascotCorner": "right", "avoidArea": {"x": 985, "y": 2083, "w": 615, "h": 765}}, {"id": "08_wizard_teal", "name": "青绿海洋小巫师", "file": "images/08_wizard_teal.png", "width": 1600, "height": 2848, "defaultText": "今天也在悄悄进步", "defaultTextEn": "Today you are growing quietly.", "themeColor": "#2a7a6b", "mascotCorner": "left", "avoidArea": {"x": 46, "y": 2083, "w": 568, "h": 550}}, {"id": "09_wizard_dreamy", "name": "梦幻紫粉小巫师", "file": "images/09_wizard_dreamy.png", "width": 1600, "height": 2848, "defaultText": "每一步都值得被看见", "defaultTextEn": "Every step deserves to be seen.", "themeColor": "#6b3fa0", "mascotCorner": "right", "avoidArea": {"x": 985, "y": 2083, "w": 615, "h": 763}}, {"id": "10_wizard_pink_love", "name": "粉色爱心小巫师", "file": "images/10_wizard_pink_love.png", "width": 1600, "height": 2848, "defaultText": "敢于表达，就是进步", "defaultTextEn": "Speak up, that's progress.", "themeColor": "#c44569", "mascotCorner": "right", "avoidArea": {"x": 985, "y": 2083, "w": 593, "h": 738}}, {"id": "11_basketball_blue", "name": "蓝天篮球小勇士", "file": "images/11_basketball_blue.png", "width": 1600, "height": 2848, "defaultText": "坚持一下，就会更近", "defaultTextEn": "Keep going, get closer.", "themeColor": "#2d5a9f", "mascotCorner": "right", "avoidArea": {"x": 985, "y": 2083, "w": 615, "h": 587}}, {"id": "12_wizard_pink_frame", "name": "粉色边框小巫师", "file": "images/12_wizard_pink_frame.png", "width": 1600, "height": 2848, "defaultText": "敢于表达，就是进步", "defaultTextEn": "Speak up, that's progress.", "themeColor": "#c44569", "mascotCorner": "right", "avoidArea": {"x": 985, "y": 2083, "w": 593, "h": 738}}, {"id": "13_wizard_red_gold", "name": "红金庆典小巫师", "file": "images/13_wizard_red_gold.png", "width": 1600, "height": 2848, "defaultText": "今天也为你鼓掌", "defaultTextEn": "Clapping for you today.", "themeColor": "#8b1a1a", "mascotCorner": "right", "avoidArea": {"x": 985, "y": 2083, "w": 615, "h": 765}}, {"id": "14_wizard_certificate", "name": "金色奖状小巫师", "file": "images/14_wizard_certificate.png", "width": 1600, "height": 2848, "defaultText": "努力会闪闪发光", "defaultTextEn": "Effort shines brightly.", "themeColor": "#b8860b", "mascotCorner": "left", "avoidArea": {"x": 0, "y": 2083, "w": 614, "h": 765}}, {"id": "15_wizard_light_blue", "name": "浅蓝思考小巫师", "file": "images/15_wizard_light_blue.png", "width": 1600, "height": 2848, "defaultText": "认真思考，答案会来", "defaultTextEn": "Think carefully, answers come.", "themeColor": "#3a7ca5", "mascotCorner": "right", "avoidArea": {"x": 985, "y": 2083, "w": 610, "h": 748}}, {"id": "16_wizard_rain", "name": "雨滴探索小巫师", "file": "images/16_wizard_rain.png", "width": 1600, "height": 2848, "defaultText": "带着好奇去发现", "defaultTextEn": "Discover with curiosity.", "themeColor": "#4a90b8", "mascotCorner": "right", "avoidArea": {"x": 985, "y": 2083, "w": 615, "h": 748}}, {"id": "17_basketball_blue_sky", "name": "蓝天白云小球员", "file": "images/17_basketball_blue_sky.png", "width": 1600, "height": 2848, "defaultText": "相信自己，你可以", "defaultTextEn": "Believe you can.", "themeColor": "#e63946", "mascotCorner": "left", "avoidArea": {"x": 0, "y": 2083, "w": 614, "h": 641}}, {"id": "18_basketball_gold", "name": "金色荣耀小球员", "file": "images/18_basketball_gold.png", "width": 1600, "height": 2848, "defaultText": "你的努力闪闪发光", "defaultTextEn": "Your effort shines bright.", "themeColor": "#e63946", "mascotCorner": "right", "avoidArea": {"x": 985, "y": 2083, "w": 615, "h": 765}}, {"id": "19_basketball_green", "name": "绿色成长小球员", "file": "images/19_basketball_green.png", "width": 1600, "height": 2848, "defaultText": "再试一次，也很勇敢", "defaultTextEn": "Try again, be brave.", "themeColor": "#2d8b4e", "mascotCorner": "right", "avoidArea": {"x": 985, "y": 2083, "w": 615, "h": 622}}, {"id": "20_basketball_pink", "name": "粉色甜蜜小球员", "file": "images/20_basketball_pink.png", "width": 1600, "height": 2848, "defaultText": "带着快乐慢慢进步", "defaultTextEn": "Grow happily step by step.", "themeColor": "#e63946", "mascotCorner": "right", "avoidArea": {"x": 985, "y": 2083, "w": 584, "h": 658}}, {"id": "21_note_blue_stars", "name": "蓝色星空便签", "file": "images/21_note_blue_stars.png", "width": 562, "height": 1000, "defaultText": "今天也要加油呀", "defaultTextEn": "Keep going today!", "themeColor": "#3a7ca5"}, {"id": "22_basketball_red_warm", "name": "红火热情小球员", "file": "images/22_basketball_red_warm.png", "width": 1600, "height": 2848, "defaultText": "今天也很棒", "defaultTextEn": "Today you are amazing.", "themeColor": "#e63946", "mascotCorner": "right", "avoidArea": {"x": 985, "y": 2083, "w": 615, "h": 765}}, {"id": "23_basketball_yellow", "name": "暖黄收获小球员", "file": "images/23_basketball_yellow.png", "width": 1600, "height": 2848, "defaultText": "认真完成，就是进步", "defaultTextEn": "Well done, progress made.", "themeColor": "#e63946", "mascotCorner": "right", "avoidArea": {"x": 985, "y": 2083, "w": 615, "h": 614}}, {"id": "24_romantic_pink", "name": "粉色浪漫爱心", "file": "images/24_romantic_pink.png", "width": 562, "height": 1000, "defaultText": "你值得被温柔以待", "defaultTextEn": "You deserve all the love.", "themeColor": "#d63384"}];
+const TEMPLATES = [
+  {"id":"01_wizard_green","name":"绿色星空小巫师","file":BASE+"images/01_wizard_green.png","width":1600,"height":2848,"defaultText":"每一次尝试都有光芒","defaultTextEn":"Every try has its light.","themeColor":"#2d5a27","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":603,"h":748}},
+  {"id":"02_wizard_warm","name":"暖黄魔法小巫师","file":BASE+"images/02_wizard_warm.png","width":1600,"height":2848,"defaultText":"相信自己，你也有光","defaultTextEn":"Believe in your own light.","themeColor":"#8b6914","mascotCorner":"left","avoidArea":{"x":6,"y":2083,"w":608,"h":609}},
+  {"id":"03_wizard_pink","name":"粉色樱花小巫师","file":BASE+"images/03_wizard_pink.png","width":1600,"height":2848,"defaultText":"今天的你也很闪亮","defaultTextEn":"Today you shine bright too.","themeColor":"#c44569","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":615,"h":748}},
+  {"id":"04_wizard_blue","name":"蓝天雨滴小巫师","file":BASE+"images/04_wizard_blue.png","width":1600,"height":2848,"defaultText":"勇敢说，勇敢做","defaultTextEn":"Speak bravely, act bravely.","themeColor":"#2d6a9f","mascotCorner":"left","avoidArea":{"x":36,"y":2083,"w":578,"h":600}},
+  {"id":"05_wizard_warm_orange","name":"暖橙阳光小巫师","file":BASE+"images/05_wizard_warm_orange.png","width":1600,"height":2848,"defaultText":"慢慢走，也能到达","defaultTextEn":"Walk slowly, you will arrive.","themeColor":"#b8560e","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":395,"h":573}},
+  {"id":"06_wizard_purple","name":"梦幻紫色小巫师","file":BASE+"images/06_wizard_purple.png","width":1600,"height":2848,"defaultText":"把困难变成小星星","defaultTextEn":"Turn difficulties into little stars.","themeColor":"#5b4a9d","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":615,"h":765}},
+  {"id":"07_wizard_gold","name":"金色荣耀小巫师","file":BASE+"images/07_wizard_gold.png","width":1600,"height":2848,"defaultText":"认真的你自带光芒","defaultTextEn":"Your effort carries its own light.","themeColor":"#8b6914","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":615,"h":765}},
+  {"id":"08_wizard_teal","name":"青绿海洋小巫师","file":BASE+"images/08_wizard_teal.png","width":1600,"height":2848,"defaultText":"今天也在悄悄进步","defaultTextEn":"Today you are growing quietly.","themeColor":"#2a7a6b","mascotCorner":"left","avoidArea":{"x":46,"y":2083,"w":568,"h":550}},
+  {"id":"09_wizard_dreamy","name":"梦幻紫粉小巫师","file":BASE+"images/09_wizard_dreamy.png","width":1600,"height":2848,"defaultText":"每一步都值得被看见","defaultTextEn":"Every step deserves to be seen.","themeColor":"#6b3fa0","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":615,"h":763}},
+  {"id":"10_wizard_pink_love","name":"粉色爱心小巫师","file":BASE+"images/10_wizard_pink_love.png","width":1600,"height":2848,"defaultText":"敢于表达，就是进步","defaultTextEn":"Speak up, that's progress.","themeColor":"#c44569","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":593,"h":738}},
+  {"id":"11_basketball_blue","name":"蓝天篮球小勇士","file":BASE+"images/11_basketball_blue.png","width":1600,"height":2848,"defaultText":"坚持一下，就会更近","defaultTextEn":"Keep going, get closer.","themeColor":"#2d5a9f","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":615,"h":587}},
+  {"id":"12_wizard_pink_frame","name":"粉色边框小巫师","file":BASE+"images/12_wizard_pink_frame.png","width":1600,"height":2848,"defaultText":"敢于表达，就是进步","defaultTextEn":"Speak up, that's progress.","themeColor":"#c44569","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":593,"h":738}},
+  {"id":"13_wizard_red_gold","name":"红金庆典小巫师","file":BASE+"images/13_wizard_red_gold.png","width":1600,"height":2848,"defaultText":"今天也为你鼓掌","defaultTextEn":"Clapping for you today.","themeColor":"#8b1a1a","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":615,"h":765}},
+  {"id":"14_wizard_certificate","name":"金色奖状小巫师","file":BASE+"images/14_wizard_certificate.png","width":1600,"height":2848,"defaultText":"努力会闪闪发光","defaultTextEn":"Effort shines brightly.","themeColor":"#b8860b","mascotCorner":"left","avoidArea":{"x":0,"y":2083,"w":614,"h":765}},
+  {"id":"15_wizard_light_blue","name":"浅蓝思考小巫师","file":BASE+"images/15_wizard_light_blue.png","width":1600,"height":2848,"defaultText":"认真思考，答案会来","defaultTextEn":"Think carefully, answers come.","themeColor":"#3a7ca5","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":610,"h":748}},
+  {"id":"16_wizard_rain","name":"雨滴探索小巫师","file":BASE+"images/16_wizard_rain.png","width":1600,"height":2848,"defaultText":"带着好奇去发现","defaultTextEn":"Discover with curiosity.","themeColor":"#4a90b8","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":615,"h":748}},
+  {"id":"17_basketball_blue_sky","name":"蓝天白云小球员","file":BASE+"images/17_basketball_blue_sky.png","width":1600,"height":2848,"defaultText":"相信自己，你可以","defaultTextEn":"Believe you can.","themeColor":"#e63946","mascotCorner":"left","avoidArea":{"x":0,"y":2083,"w":614,"h":641}},
+  {"id":"18_basketball_gold","name":"金色荣耀小球员","file":BASE+"images/18_basketball_gold.png","width":1600,"height":2848,"defaultText":"你的努力闪闪发光","defaultTextEn":"Your effort shines bright.","themeColor":"#e63946","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":615,"h":765}},
+  {"id":"19_basketball_green","name":"绿色成长小球员","file":BASE+"images/19_basketball_green.png","width":1600,"height":2848,"defaultText":"再试一次，也很勇敢","defaultTextEn":"Try again, be brave.","themeColor":"#2d8b4e","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":615,"h":622}},
+  {"id":"20_basketball_pink","name":"粉色甜蜜小球员","file":BASE+"images/20_basketball_pink.png","width":1600,"height":2848,"defaultText":"带着快乐慢慢进步","defaultTextEn":"Grow happily step by step.","themeColor":"#e63946","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":584,"h":658}},
+  {"id":"21_note_blue_stars","name":"蓝色星空便签","file":BASE+"images/21_note_blue_stars.png","width":562,"height":1000,"defaultText":"今天也要加油呀","defaultTextEn":"Keep going today!","themeColor":"#3a7ca5"},
+  {"id":"22_basketball_red_warm","name":"红火热情小球员","file":BASE+"images/22_basketball_red_warm.png","width":1600,"height":2848,"defaultText":"今天也很棒","defaultTextEn":"Today you are amazing.","themeColor":"#e63946","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":615,"h":765}},
+  {"id":"23_basketball_yellow","name":"暖黄收获小球员","file":BASE+"images/23_basketball_yellow.png","width":1600,"height":2848,"defaultText":"认真完成，就是进步","defaultTextEn":"Well done, progress made.","themeColor":"#e63946","mascotCorner":"right","avoidArea":{"x":985,"y":2083,"w":615,"h":614}},
+  {"id":"24_romantic_pink","name":"粉色浪漫爱心","file":BASE+"images/24_romantic_pink.png","width":562,"height":1000,"defaultText":"你值得被温柔以待","defaultTextEn":"You deserve all the love.","themeColor":"#d63384"}
+];
 
 // ============ STATE ============
 let currentTemplate = null;
@@ -239,7 +279,7 @@ let isDragging=false, dragStartX, dragStartY;
 let textBox={x:0,y:0,w:400,h:200};
 let isResizing=false, resizeHandle=null;
 let previewMode=false, bgImage=null;
-let userTextZh="", userTextEn=""; // user-edited text
+let userTextZh="", userTextEn="";
 
 // ============ INIT ============
 function init(){
@@ -252,6 +292,20 @@ function init(){
   if(TEMPLATES.length>0) loadTemplate(TEMPLATES[0]);
   setupCanvasEvents();
   setupToolbarEvents();
+  console.log('[init] BASE path =', BASE);
+}
+
+// ============ ERROR HELPER ============
+function showError(msg){
+  console.error(msg);
+  let box = document.getElementById('errorBox');
+  if(!box){
+    box = document.createElement('div');
+    box.id = 'errorBox';
+    box.className = 'error-box';
+    document.body.appendChild(box);
+  }
+  box.textContent = msg;
 }
 
 // ============ RENDER GRID ============
@@ -261,7 +315,8 @@ function renderTemplateGrid(){
   TEMPLATES.forEach((tpl,idx)=>{
     const card=document.createElement('div');
     card.className='template-card'+(idx===0?' active':'');
-    card.innerHTML=`<img src="${tpl.file}" alt="${tpl.name}" loading="lazy"><div class="card-name">${tpl.name}</div>`;
+    card.innerHTML=`<img src="${tpl.file}" alt="${tpl.name}" loading="lazy" onerror="showError('❌ 缩略图加载失败: ${tpl.file}')">`
+      + `<div class="card-name">${tpl.name}</div>`;
     card.onclick=()=>{
       document.querySelectorAll('.template-card').forEach(c=>c.classList.remove('active'));
       card.classList.add('active');
@@ -292,22 +347,25 @@ function loadTemplate(tpl){
     textBox={x:margin,y:margin,w:tpl.width-2*margin,h:safeBottom-margin};
     redraw();
   };
+  img.onerror=()=>{
+    showError('❌ 图片加载失败: '+tpl.file+' (BASE='+BASE+')');
+    console.error('Image failed:', tpl.file, '| Full URL:', window.location.origin+BASE+'images/'+tpl.file.split('/').pop());
+  };
   img.src=tpl.file;
 }
 
+// ====== 第2段结束，下面是第3段 ======
+ <!-- ===== 第3段开始，接在第2段后面 ===== -->
 // ============ REDRAW ============
 function redraw(){
   if(!currentTemplate) return;
   ctx.clearRect(0,0,canvas.width,canvas.height);
   if(previewMode) return;
-  // Dashed box
   ctx.strokeStyle='#4a90d9'; ctx.lineWidth=2; ctx.setLineDash([8,4]);
   ctx.strokeRect(textBox.x,textBox.y,textBox.w,textBox.h);
   ctx.setLineDash([]);
-  // Handles
   ctx.fillStyle='#4a90d9';
   getResizeHandles().forEach(h=>{ ctx.beginPath(); ctx.arc(h.x,h.y,8,0,Math.PI*2); ctx.fill(); });
-  // Text preview
   drawTextInBox();
 }
 
@@ -402,7 +460,7 @@ function setupCanvasEvents(){
 }
 function getCanvasPoint(e){
   const r=canvas.getBoundingClientRect();
-  return {(e.clientX-r.left)*(canvas.width/r.width),(e.clientY-r.top)*(canvas.height/r.height)};
+  return {x:(e.clientX-r.left)*(canvas.width/r.width),y:(e.clientY-r.top)*(canvas.height/r.height)};
 }
 function onMouseDown(e){
   if(previewMode) return;
@@ -437,8 +495,6 @@ function onMouseMove(e){
   canvas.style.cursor=h?h.cursor:(pt.x>=textBox.x&&pt.x<=textBox.x+textBox.w&&pt.y>=textBox.y&&pt.y<=textBox.y+textBox.h)?'move':'default';
 }
 function onMouseUp(){ isDragging=false; isResizing=false; resizeHandle=null; canvas.style.cursor='move'; }
-
-// Touch
 function onTouchStart(e){ e.preventDefault(); if(e.touches.length===1) onMouseDown({clientX:e.touches[0].clientX,clientY:e.touches[0].clientY}); }
 function onTouchMove(e){ e.preventDefault(); if(e.touches.length===1) onMouseMove({clientX:e.touches[0].clientX,clientY:e.touches[0].clientY}); }
 function onTouchEnd(e){ e.preventDefault(); onMouseUp(); }
@@ -496,11 +552,9 @@ function generateImage(){
   let lines=wrapText(octx,text,textBox.w-20);
   const startY=textBox.y+10;
   const lineH=fs*lh;
-  // Auto-fit
   let afs=fs, alines=lines;
   while(startY+alines.length*lineH>textBox.y+textBox.h-10&&afs>10){ afs--; octx.font=`${fw} ${afs}px ${ff}`; alines=wrapText(octx,text,textBox.w-20); }
   alines.forEach((line,i)=>{ let x=ta==='center'?textBox.x+textBox.w/2:ta==='right'?textBox.x+textBox.w-10:textBox.x+10; octx.fillText(line,x,startY+i*afs*lh); });
-  // English
   const enText=userTextEn||currentTemplate.defaultTextEn;
   if(enText){
     octx.font=`${fw} ${Math.round(afs*0.7)}px ${ff}`;
@@ -534,3 +588,4 @@ window.addEventListener('DOMContentLoaded',init);
 </script>
 </body>
 </html>
+<!-- ===== 第3段结束，全文完 ===== -->
