@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>鼓励贴生成器</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Microsoft YaHei','仓耳舒圆',sans-serif;background:#f0f2f5;display:flex;height:100vh;overflow:hidden;}
+
+  /* 左侧栏 */
+  .sidebar{width:240px;min-width:240px;background:#fff;border-right:1px solid #e8e8e8;display:flex;flex-direction:column;}
+  .logo{padding:16px 14px;font-size:16px;font-weight:bold;border-bottom:1px solid #f0f0f0;}
+  .steps{padding:10px 14px;font-size:12px;color:#999;border-bottom:1px solid #f0f0f0;line-height:1.8;}
+  .template-list{flex:1;overflow-y:auto;padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .template-item{border-radius:8px;overflow:hidden;border:2px solid transparent;cursor:pointer;transition:all .2s;background:#fafafa;}
+  .template-item img{width:100%;display:block;aspect-ratio:9/16;object-fit:cover;}
+  .template-item span{display:block;font-size:10px;text-align:center;padding:4px 2px;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .template-item:hover{border-color:#4a90d9;transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.1);}
+  .template-item.active{border-color:#ff6b6b;box-shadow:0 0 8px rgba(255,107,107,.4);}
+
+  /* 主区域 */
+  .main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+
+  /* 工具栏 */
+  .toolbar{background:#fff;padding:10px 20px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #e8e8e8;flex-wrap:wrap;}
+  .toolbar label{font-size:12px;color:#666;white-space:nowrap;}
+  .toolbar select,.toolbar input[type=color]{padding:5px 8px;border:1px solid #d9d9d9;border-radius:4px;font-size:13px;outline:none;height:30px;}
+  .toolbar input[type=color]{width:34px;padding:2px;cursor:pointer;}
+  .toolbar-group{display:flex;align-items:center;gap:6px;padding:0 8px;border-right:1px solid #eee;height:34px;}
+  .toolbar-group:last-child{border-right:none;margin-left:auto;}
+  .btn{padding:6px 16px;border-radius:5px;cursor:pointer;font-size:13px;border:none;color:#fff;display:flex;align-items:center;gap:4px;height:30px;transition:all .2s;}
+  .btn-edit{background:#ff6b6b;}
+  .btn-edit:hover{background:#ee5a5a;}
+  .btn-preview{background:#fff;border:1px solid #4a90d9;color:#4a90d9;}
+  .btn-preview:hover{background:#f0f7ff;}
+  .btn-generate{background:#4a90d9;}
+  .btn-generate:hover{background:#3a7bc8;}
+
+  /* 画布区 */
+  .canvas-wrap{flex:1;display:flex;align-items:center;justify-content:center;background:#e0e0e0;position:relative;overflow:hidden;}
+  canvas{cursor:default;box-shadow:0 8px 32px rgba(0,0,0,.15);border-radius:4px;}
+
+  /* 预览条 */
+  #previewBar{position:fixed;top:0;left:240px;right:0;background:#4a90d9;color:#fff;text-align:center;padding:8px;z-index:100;transform:translateY(-100%);transition:transform .3s;font-size:14px;}
+  #previewBar.active{transform:translateY(0);}
+  #previewBar button{background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.5);padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;margin-left:10px;}
+
+  /* Toast */
+  #toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%) translateY(20px);background:rgba(0,0,0,.75);color:#fff;padding:10px 24px;border-radius:20px;opacity:0;transition:all .3s;z-index:200;font-size:14px;}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  /* 错误提示 */
+  .error-box{position:fixed;bottom:40px;left:20px;background:#d93025;color:#fff;padding:12px 20px;border-radius:8px;font-size:13px;z-index:999;max-width:420px;display:none;white-space:pre-wrap;}
+  .error-box.show{display:block;}
+
+  /* 模态框 */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:300;}
+  .modal-overlay.active{display:flex;}
+  .modal-box{background:#fff;border-radius:12px;padding:24px;width:440px;max-width:92vw;box-shadow:0 12px 48px rgba(0,0,0,.2);}
+  .modal-title{font-size:17px;font-weight:bold;margin-bottom:18px;color:#333;}
+  .modal-group{margin-bottom:16px;}
+  .modal-group label{display:block;font-size:13px;margin-bottom:6px;color:#444;font-weight:500;}
+  .modal-group textarea{width:100%;padding:10px 12px;border:1px solid #d9d9d9;border-radius:8px;font-size:14px;resize:vertical;min-height:90px;font-family:inherit;line-height:1.6;outline:none;transition:border .2s;}
+  .modal-group textarea:focus{border-color:#4a90d9;box-shadow:0 0 0 2px rgba(74,144,217,.15);}
+  .modal-group input[type=text]{width:100%;padding:10px 12px;border:1px solid #d9d9d9;border-radius:8px;font-size:14px;outline:none;transition:border .2s;}
+  .modal-group input[type=text]:focus{border-color:#4a90d9;box-shadow:0 0 0 2px rgba(74,144,217,.15);}
+  .hint-text{font-size:12px;color:#999;margin-top:4px;}
+  .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px;}
+  .btn-cancel{padding:8px 22px;border:1px solid #d9d9d9;background:#fff;border-radius:6px;cursor:pointer;font-size:13px;color:#666;}
+  .btn-cancel:hover{background:#f5f5f5;}
+  .btn-confirm{padding:8px 22px;background:#4a90d9;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;}
+  .btn-confirm:hover{background:#3a7bc8;}
+
+  /* 响应式 */
+  @media (max-width:768px){
+    .sidebar{width:100px;min-width:100px;}
+    .logo{font-size:12px;padding:10px 6px;}
+    .steps{display:none;}
+    .template-list{grid-template-columns:1fr;gap:6px;padding:8px;}
+    .template-item span{font-size:9px;}
+    .toolbar{padding:6px 10px;gap:6px;}
+    .toolbar-group{height:28px;padding:0 4px;}
+    .toolbar select,.toolbar input[type=color]{height:26px;font-size:12px;padding:2px 4px;}
+    .btn{height:26px;padding:4px 10px;font-size:12px;}
+  }
+</style>
+</head>
+<body>
+
+<!-- 左侧栏 -->
+<div class="sidebar">
+  <div class="logo">🎨 鼓励贴生成器</div>
+  <div class="steps">
+    ① 选择模板<br>
+    ② 编辑文字<br>
+    ③ 一键生成
+  </div>
+  <div class="template-list" id="templateList"></div>
+</div>
+
+<!-- 主区域 -->
+<div class="main">
+  <div id="previewBar">
+    👁 预览模式 — 文字已锁定
+    <button onclick="exitPreview()">退出预览</button>
+    <button onclick="generateImage()">💾 保存图片</button>
+  </div>
+
+  <div class="toolbar">
+    <div class="toolbar-group">
+      <label>字体</label>
+      <select id="fontFamily">
+        <option value="Microsoft YaHei">微软雅黑</option>
+        <option value="SimHei">黑体</option>
+        <option value="KaiTi">楷体</option>
+        <option value="SimSun">宋体</option>
+        <option value="FangSong">仿宋</option>
+        <option value="STXingkai">华文行楷</option>
+        <option value="仓耳舒圆">仓耳舒圆</option>
+        <option value="Arial">Arial</option>
+      </select>
+    </div>
+    <div class="toolbar-group">
+      <label>字号</label>
+      <select id="fontSize">
+        <option value="14">14px</option>
+        <option value="16">16px</option>
+        <option value="18">18px</option>
+        <option value="20" selected>20px</option>
+        <option value="22">22px</option>
+        <option value="24">24px</option>
+        <option value="28">28px</option>
+        <option value="32">32px</option>
+        <option value="36">36px</option>
+      </select>
+    </div>
+    <div class="toolbar-group">
+      <label>颜色</label>
+      <input type="color" id="fontColor" value="#333333">
+    </div>
+    <div class="toolbar-group">
+      <label>对齐</label>
+      <select id="textAlign">
+        <option value="left">左对齐</option>
+        <option value="center" selected>居中</option>
+        <option value="right">右对齐</option>
+      </select>
+    </div>
+    <div class="toolbar-group">
+      <label>行高</label>
+      <input type="number" id="lineHeight" value="1.6" min="1" max="3" step="0.1" style="width:50px;height:28px;border:1px solid #ddd;border-radius:4px;padding:0 4px;font-size:13px;">
+    </div>
+    <div class="toolbar-group">
+      <label>加粗</label>
+      <select id="fontWeight">
+        <option value="normal" selected>普通</option>
+        <option value="bold">加粗</option>
+      </select>
+    </div>
+    <div class="toolbar-group">
+      <label>落款字号</label>
+      <select id="sigFontSize">
+        <option value="same" selected>同正文</option>
+        <option value="12">12px</option>
+        <option value="14">14px</option>
+        <option value="16">16px</option>
+        <option value="18">18px</option>
+        <option value="20">20px</option>
+        <option value="24">24px</option>
+      </select>
+    </div>
+    <div class="toolbar-group">
+      <label style="cursor:pointer;"><input type="checkbox" id="showSignature" checked style="margin-right:4px;">显示落款</label>
+    </div>
+    <div class="toolbar-group">
+      <button class="btn btn-edit" onclick="openTextEditor()">✏️ 编辑文字</button>
+      <button class="btn btn-preview" onclick="togglePreview()">👁 预览</button>
+      <button class="btn btn-generate" onclick="generateImage()">💾 生成图片</button>
+    </div>
+  </div>
+
+  <div class="canvas-wrap" id="canvasWrap">
+    <canvas id="canvas"></canvas>
+  </div>
+</div>
+
+<!-- 编辑文字弹窗 -->
+<div class="modal-overlay" id="textModal">
+  <div class="modal-box">
+    <div class="modal-title">✏️ 编辑文字内容</div>
+
+    <div class="modal-group">
+      <label for="editTextZh">📝 正文内容（支持换行，按回车即可）</label>
+      <textarea id="editTextZh" placeholder="亲爱的XXX：&#10;&#10;每一次尝试都有光芒&#10;慢慢走，也能到达"></textarea>
+      <div class="hint-text">💡 提示：在输入框中按回车键换行，图片上会同步换行显示。</div>
+    </div>
+
+    <div class="modal-group">
+      <label for="editSigText">✍️ 落款文字</label>
+      <input type="text" id="editSigText" placeholder="永远爱你的妈妈">
+    </div>
+
+    <div class="modal-group">
+      <label for="editSigDate">📅 落款日期</label>
+      <input type="text" id="editSigDate">
+      <div class="hint-text">格式示例：2026.08.20（默认自动填充当天日期）</div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeTextEditor()">取消</button>
+      <button class="btn-confirm" onclick="confirmText()">确认</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div class="error-box" id="errorBox"></div>
+
+<script>
+// ============ 模板数据（纯相对路径，无 BASE 黑魔法） ============
+const TEMPLATES = [
+  {"id":"01_wizard_green","name":"绿色星空小巫师","file":"images/01_wizard_green.png","width":1600,"height":2848,"avoidArea":{"x":985,"y":2083,"w":603,"h":748}},
+  {"id":"02_wizard_warm","name":"暖黄魔法小巫师","file":"images/02_wizard_warm.png","width":1600,"height":2848,"avoidArea":{"x":6,"y":2083,"w":608,"h":609}},
+  {"id":"03_wizard_pink","name":"粉色樱花小巫师","file":"images/03_wizard_pink.png","width":1600,"height":2848,"avoidArea":{"x":985,"y":2083,"w":615,"h":748}},
+  {"id":"04_wizard_blue","name":"蓝天雨滴小巫师","file":"images/04_wizard_blue.png","width":1600,"height":2848,"avoidArea":{"x":36,"y":2083,"w":578,"h":600}},
+  {"id":"05_wizard_warm_orange","name":"暖橙阳光小巫师","file":"images/05_wizard_warm_orange.png","width":1600,"height":2848,"avoidArea":{"x":985,"y":2083,"w":395,"h":573}},
+  {"id":"06_wizard_purple","name":"梦幻紫色小巫师","file":"images/06_wizard_purple.png","width":1600,"height":2848,"avoidArea":{"x":985,"y":2083,"w":615,"h":765}},
+  {"id":"07_wizard_gold","name":"金色荣耀小巫师","file":"images/07_wizard_gold.png","width":1600,"height":2848,"avoidArea":{"x":985,"y":2083,"w":615,"h":765}},
+  {"id":"08_wizard_teal","name":"青绿海洋小巫师","file":"images/08_wizard_teal.png","width":1600,"height":2848,"avoidArea":{"x":46,"y":2083,"w":568,"h":550}},
+  {"id":"09_wizard_dreamy","name":"梦幻紫粉小巫师","file":"images/09_wizard_dreamy.png","width":1600,"height":2848,"avoidArea":{"x":985,"y":2083,"w":615,"h":763}},
+  {"id":"10_wizard_pink_love","name":"粉色爱心小巫师","file":"images/10_wizard_pink_love.png","width":1600,"height":2848,"avoidArea":{"x":985,"y":2083,"w":593,"h":738}},
+  {"id":"11_basketball_blue","name":"蓝天篮球小勇士","file":"images/11_basketball_blue.png","width":1600,"height":2848,"avoidArea":{"x":985,"y":2083,"w":615,"h":587}},
+  {"id":"12_wizard_pink_frame","name":"粉色边框小巫师","file":"images/12_wizard_pink_frame.png","width":1600,"height":2848,"avoidArea":{"x":985,"y":2083,"w":593,"h":738}},
+  {"id":"13_wizard_red_gold","name":"红金庆典小巫师","file":"images/13_wizard_red_gold.png","width":1600,"height":2848,"avoidArea":{"x":985,"y":2083,"w":615,"h":765}},
+  {"id":"14_wizard_certificate","name":"金色奖状小巫师","file":"images/14_wizard_certificate.png","width":1600,"height":2848,"avoidArea":{"x":0,"y":2083,"w":614,"h":765}},
+  {"id":"15_wizard_light_blue","name":"浅蓝思考小巫师","file":"images/15_wizard_light_blue.png","width":1600,"height":2848,"avoidArea":{"x":985,"y":2083,"w":610,"h":748}},
+  {"id":"16_wizard_rain","name":"雨滴探索小巫师","file":"images/16_wizard_rain.png","width":1600,"height":2848,"avoidArea":{"x":985,"y":2083,"w":615,"h":748}},
+  {"id":"17_basketball_blue_sky","name":"蓝天白云小球员","file":"images/17_basketball_blue_sky.png","width":1600,"height":2848,"avoidArea":{"x":0,"y":2083,"w":614,"h":641}},
+  {"id":"18_basketball_gold","name":"金色荣耀小球员","file":"images/18_basketball_gold.png","width":1600,"height":2848,"avoidArea":{"x":985,"y":2083,"w":615,"h":765}},
+  {"id":"19_basketball_green","name":"绿色成长小球员","file":"images/19_basketball_green.png","width":1600,"height":2848,"avoidArea":{"x":985,"y":2083,"w":615,"h":622}},
+  {"id":"20_basketball_pink","name":"粉色甜蜜小球员","file":"images/20_basketball_pink.png","width":1600,"height":2848,"avoidArea":{"x":985,"y":2083,"w":584,"h":658}},
+  {"id":"21_note_blue_stars","name":"蓝色星空便签","file":"images/21_note_blue_stars.png","width":562,"height":1000},
+  {"id":"22_basketball_red_warm","name":"红火热情小球员","file":"images/22_basketball_red_warm.png","width":1600,"height":2848,"avoidArea":{"x":985,"y":2083,"w":615,"h":765}},
+  {"id":"23_basketball_yellow","name":"暖黄收获小球员","file":"images/23_basketball_yellow.png","width":1600,"height":2848,"avoidArea":{"x":985,"y":2083,"w":615,"h":614}},
+  {"id":"24_romantic_pink","name":"粉色浪漫爱心","file":"images/24_romantic_pink.png","width":562,"height":1000}
+];
+
+// ============ 全局状态 ============
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const MAX_W = 500;
+const MAX_H = 700;
+
+let currentTemplate = null;
+let bgImage = null;
+let previewMode = false;
+
+// 文本框（坐标基于模板原始尺寸）
+let textBox = {x:80, y:200, w:440, h:400};
+// 落款框
+let sigBox = {x:350, y:2400, w:220, h:72};
+
+// 用户文字
+let userTextZh = '';
+let userSigText = '永远爱你的妈妈';
+let userSigDate = '';
+
+// 拖拽/缩放状态
+let dragTarget = null; // 'text' | 'sig' | null
+let dragOffsetX = 0, dragOffsetY = 0;
+let resizeTarget = null;
+let resizeCorner = '';
+let dragStartX = 0, dragStartY = 0;
+
+// ============ 初始化 ============
+function init(){
+  renderTemplates();
+  if(TEMPLATES.length > 0) selectTemplate(TEMPLATES[0]);
+  setupCanvasEvents();
+  setupToolbarEvents();
+  userSigDate = new Date().toLocaleDateString('zh-CN').replace(/\//g, '.');
+  console.log('[init] 当前路径:', window.location.href);
+}
+
+// ============ 渲染左侧模板列表 ============
+function renderTemplates(){
+  const list = document.getElementById('templateList');
+  list.innerHTML = '';
+  TEMPLATES.forEach((t, idx) => {
+    const div = document.createElement('div');
+    div.className = 'template-item' + (idx === 0 ? ' active' : '');
+    // 左侧缩略图：纯相对路径
+    div.innerHTML =
+      '<img src="' + t.file + '" alt="' + t.name + '" loading="lazy" onerror="showError(\'缩略图裂了: ' + t.file + '\')">' +
+      '<span>' + t.name + '</span>';
+    div.onclick = function(){
+      document.querySelectorAll('.template-item').forEach(function(c){c.classList.remove('active');});
+      div.classList.add('active');
+      selectTemplate(t);
+    };
+    list.appendChild(div);
+  });
+}
+
+// ============ 选择模板 ============
+function selectTemplate(t){
+  currentTemplate = t;
+  bgImage = new Image();
+  // 不加 crossOrigin，避免同域 CORS 干扰
+  bgImage.onload = function(){
+    console.log('[load] OK:', t.file, bgImage.width + 'x' + bgImage.height);
+    resetBoxes();
+    redraw();
+  };
+  bgImage.onerror = function(){
+    var msg = '图片加载失败: ' + t.file + '\n请检查 images 文件夹是否存在该文件';
+    console.error(msg);
+    showError(msg);
+  };
+  bgImage.src = t.file;
+}
+
+// ============ 重置文本框到合理位置 ============
+function resetBoxes(){
+  var tpl = currentTemplate;
+  if(!tpl) return;
+  var margin = 80;
+  var safeBottom = Math.floor(tpl.height * 0.55);
+  if(tpl.avoidArea) safeBottom = Math.min(safeBottom, tpl.avoidArea.y - 40);
+  textBox = {x: margin, y: margin + 40, w: tpl.width - 2*margin, h: safeBottom - margin - 40};
+  var sigY = tpl.height - 180;
+  if(tpl.avoidArea && tpl.avoidArea.y) sigY = Math.min(sigY, tpl.avoidArea.y - 100);
+  sigBox = {x: tpl.width - 280, y: sigY, w: 220, h: 72};
+}
+
+// ============ 坐标换算 ============
+function getTransform(){
+  if(!currentTemplate) return {scale:1, offsetX:0, offsetY:0};
+  var scale = Math.min(MAX_W / currentTemplate.width, MAX_H / currentTemplate.height);
+  var dispW = currentTemplate.width * scale;
+  var dispH = currentTemplate.height * scale;
+  return {
+    scale: scale,
+    offsetX: (MAX_W - dispW) / 2,
+    offsetY: (MAX_H - dispH) / 2
+  };
+}
+
+// 屏幕像素坐标 → 模板原始坐标
+function screenToTemplate(sx, sy){
+  var t = getTransform();
+  return {
+    x: (sx - t.offsetX) / t.scale,
+    y: (sy - t.offsetY) / t.scale
+  };
+}
+
+// ============ 核心绘制 ============
+function redraw(){
+  if(!currentTemplate || !bgImage) return;
+
+  var t = getTransform();
+  var scale = t.scale;
+
+  // 画布尺寸固定为显示尺寸
+  canvas.width = MAX_W;
+  canvas.height = MAX_H;
+
+  ctx.clearRect(0, 0, MAX_W, MAX_H);
+
+  // 1. 画背景图（等比缩放居中）
+  var dispW = currentTemplate.width * scale;
+  var dispH = currentTemplate.height * scale;
+  ctx.drawImage(bgImage, t.offsetX, t.offsetY, dispW, dispH);
+
+  if(previewMode){
+    drawTextOnCanvas(t);
+    if(document.getElementById('showSignature').checked) drawSigOnCanvas(t);
+    return;
+  }
+
+  // 2. 画正文虚线框（在模板坐标下）
+  ctx.save();
+  ctx.translate(t.offsetX, t.offsetY);
+  ctx.scale(scale, scale);
+
+  ctx.strokeStyle = '#4a90d9';
+  ctx.lineWidth = 2 / scale;
+  ctx.setLineDash([8/scale, 4/scale]);
+  ctx.strokeRect(textBox.x, textBox.y, textBox.w, textBox.h);
+  ctx.setLineDash([]);
+
+  drawTextContent(ctx, textBox, userTextZh || '点击「编辑文字」输入内容...');
+
+  // 3. 画落款框
+  if(document.getElementById('showSignature').checked){
+    ctx.strokeStyle = '#e76f51';
+    ctx.lineWidth = 1.5 / scale;
+    ctx.setLineDash([6/scale, 4/scale]);
+    ctx.strokeRect(sigBox.x, sigBox.y, sigBox.w, sigBox.h);
+    ctx.setLineDash([]);
+    drawSigContent(ctx, sigBox);
+  }
+
+  ctx.restore();
+
+  // 4. 画手柄（屏幕坐标）
+  drawHandles(t);
+}
+
+// ============ 正文绘制（带缩放的 ctx） ============
+function drawTextContent(context, box, text){
+  var ff = document.getElementById('fontFamily').value;
+  var fs = parseInt(document.getElementById('fontSize').value, 10);
+  var fc = document.getElementById('fontColor').value;
+  var ta = document.getElementById('textAlign').value;
+  var lh = parseFloat(document.getElementById('lineHeight').value);
+  var fw = document.getElementById('fontWeight').value;
+
+  context.font = fw + ' ' + fs + 'px ' + ff;
+  context.fillStyle = fc;
+  context.textAlign = ta;
+  context.textBaseline = 'top';
+
+  // 先按 \n 分段，再按宽度折行
+  var paragraphs = text.split('\n');
+  var allLines = [];
+  for(var p = 0; p < paragraphs.length; p++){
+    if(paragraphs[p] === ''){
+      allLines.push('');
+    } else {
+      allLines = allLines.concat(wrapText(context, paragraphs[p], box.w - 24));
+    }
+  }
+
+  var startY = box.y + 12;
+  var lineH = fs * lh;
+
+  // 自动缩小字号适配
+  var afs = fs;
+  var testLines = allLines.slice();
+  while(startY + testLines.length * lineH > box.y + box.h - 12 && afs > 10){
+    afs--;
+    context.font = fw + ' ' + afs + 'px ' + ff;
+    testLines = [];
+    for(var p2 = 0; p2 < paragraphs.length; p2++){
+      if(paragraphs[p2] === '') testLines.push('');
+      else testLines = testLines.concat(wrapText(context, paragraphs[p2], box.w - 24));
+    }
+  }
+
+  context.font = fw + ' ' + afs + 'px ' + ff;
+  var finalLineH = afs * lh;
+  for(var i = 0; i < testLines.length; i++){
+    var x;
+    if(ta === 'center') x = box.x + box.w / 2;
+    else if(ta === 'right') x = box.x + box.w - 12;
+    else x = box.x + 12;
+    context.fillText(testLines[i], x, startY + i * finalLineH);
+  }
+}
+
+// ============ 落款绘制（带缩放的 ctx） ============
+function drawSigContent(context, box){
+  var ff = document.getElementById('fontFamily').value;
+  var fw = document.getElementById('fontWeight').value;
+  var ta = document.getElementById('textAlign').value;
+
+  var sigSel = document.getElementById('sigFontSize').value;
+  var sigFs = parseInt(document.getElementById('fontSize').value, 10);
+  if(sigSel !== 'same') sigFs = parseInt(sigSel, 10);
+
+  context.font = fw + ' ' + sigFs + 'px ' + ff;
+  context.fillStyle = '#555555';
+  context.textAlign = ta;
+  context.textBaseline = 'top';
+
+  var lines = [];
+  if(userSigText) lines.push(userSigText);
+  if(userSigDate) lines.push(userSigDate);
+
+  var startY = box.y + 8;
+  var lineH = sigFs * 1.5;
+  for(var i = 0; i < lines.length; i++){
+    var x;
+    if(ta === 'center') x = box.x + box.w / 2;
+    else if(ta === 'right') x = box.x + box.w - 10;
+    else x = box.x + 10;
+    context.fillText(lines[i], x, startY + i * lineH);
+  }
+}
+
+// ============ 预览模式绘制（不带缩放翻译，直接屏幕坐标） ============
+function drawTextOnCanvas(t){
+  var ff = document.getElementById('fontFamily').value;
+  var fs = parseInt(document.getElementById('fontSize').value, 10);
+  var fc = document.getElementById('fontColor').value;
+  var ta = document.getElementById('textAlign').value;
+  var lh = parseFloat(document.getElementById('lineHeight').value);
+  var fw = document.getElementById('fontWeight').value;
+
+  var scale = t.scale;
+
+  ctx.font = fw + ' ' + fs + 'px ' + ff;
+  ctx.fillStyle = fc;
+  ctx.textAlign = ta;
+  ctx.textBaseline = 'top';
+
+  var text = userTextZh || '';
+  var paragraphs = text.split('\n');
+  var allLines = [];
+  for(var p = 0; p < paragraphs.length; p++){
+    if(paragraphs[p] === '') allLines.push('');
+    else allLines = allLines.concat(wrapText(ctx, paragraphs[p], (textBox.w - 24) * scale));
+  }
+
+  var startY = t.offsetY + textBox.y * scale;
+  var lineH = fs * lh * scale;
+
+  // 适配
+  var afs = fs;
+  while(startY + allLines.length * lineH > t.offsetY + (textBox.y + textBox.h) * scale && afs > 10){
+    afs--;
+    ctx.font = fw + ' ' + afs + 'px ' + ff;
+    lineH = afs * lh * scale;
+    allLines = [];
+    for(var p2 = 0; p2 < paragraphs.length; p2++){
+      if(paragraphs[p2] === '') allLines.push('');
+      else allLines = allLines.concat(wrapText(ctx, paragraphs[p2], (textBox.w - 24) * scale));
+    }
+  }
+
+  ctx.font = fw + ' ' + afs + 'px ' + ff;
+  lineH = afs * lh * scale;
+  for(var i = 0; i < allLines.length; i++){
+    var x;
+    if(ta === 'center') x = t.offsetX + (textBox.x + textBox.w/2) * scale;
+    else if(ta === 'right') x = t.offsetX + (textBox.x + textBox.w - 12) * scale;
+    else x = t.offsetX + (textBox.x + 12) * scale;
+    ctx.fillText(allLines[i], x, startY + i * lineH);
+  }
+}
+
+function drawSigOnCanvas(t){
+  var ff = document.getElementById('fontFamily').value;
+  var fw = document.getElementById('fontWeight').value;
+  var ta = document.getElementById('textAlign').value;
+
+  var sigSel = document.getElementById('sigFontSize').value;
+  var sigFs = parseInt(document.getElementById('fontSize').value, 10);
+  if(sigSel !== 'same') sigFs = parseInt(sigSel, 10);
+
+  ctx.font = fw + ' ' + sigFs + 'px ' + ff;
+  ctx.fillStyle = '#555555';
+  ctx.textAlign = ta;
+  ctx.textBaseline = 'top';
+
+  var lines = [];
+  if(userSigText) lines.push(userSigText);
+  if(userSigDate) lines.push(userSigDate);
+
+  var startY = t.offsetY + sigBox.y * t.scale + 8 * t.scale;
+  var lineH = sigFs * 1.5 * t.scale;
+  for(var i = 0; i < lines.length; i++){
+    var x;
+    if(ta === 'center') x = t.offsetX + (sigBox.x + sigBox.w/2) * t.scale;
+    else if(ta === 'right') x = t.offsetX + (sigBox.x + sigBox.w - 10) * t.scale;
+    else x = t.offsetX + (sigBox.x + 10) * t.scale;
+    ctx.fillText(lines[i], x, startY + i * lineH);
+  }
+}
+
+// ============ 手柄绘制（屏幕坐标） ============
+function drawHandles(t){
+  var r = 7;
+  function drawHandle(x, y, color){
+    ctx.beginPath();
+    ctx.arc(t.offsetX + x * t.scale, t.offsetY + y * t.scale, r, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+  // 正文框 4 角
+  drawHandle(textBox.x, textBox.y, '#4a90d9');
+  drawHandle(textBox.x + textBox.w, textBox.y, '#4a90d9');
+  drawHandle(textBox.x, textBox.y + textBox.h, '#4a90d9');
+  drawHandle(textBox.x + textBox.w, textBox.y + textBox.h, '#4a90d9');
+  // 落款框 4 角
+  if(document.getElementById('showSignature').checked){
+    drawHandle(sigBox.x, sigBox.y, '#e76f51');
+    drawHandle(sigBox.x + sigBox.w, sigBox.y, '#e76f51');
+    drawHandle(sigBox.x, sigBox.y + sigBox.h, '#e76f51');
+    drawHandle(sigBox.x + sigBox.w, sigBox.y + sigBox.h, '#e76f51');
+  }
+}
+
+// ============ 文字折行 ============
+function wrapText(context, text, maxWidth){
+  if(!text) return [''];
+  var chars = text.split('');
+  var lines = [];
+  var cur = '';
+  for(var i = 0; i < chars.length; i++){
+    var test = cur + chars[i];
+    if(context.measureText(test).width > maxWidth && cur !== ''){
+      lines.push(cur);
+      cur = chars[i];
+    } else {
+      cur = test;
+    }
+  }
+  if(cur) lines.push(cur);
+  return lines;
+}
+
+// ============ 鼠标/触摸交互 ============
+function setupCanvasEvents(){
+  canvas.addEventListener('mousedown', onMouseDown);
+  canvas.addEventListener('mousemove', onMouseMove);
+  canvas.addEventListener('mouseup', onMouseUp);
+  canvas.addEventListener('mouseleave', onMouseUp);
+  canvas.addEventListener('touchstart', onTouchStart, {passive:false});
+  canvas.addEventListener('touchmove', onTouchMove, {passive:false});
+  canvas.addEventListener('touchend', onTouchEnd);
+}
+
+function getHandleAt(tx, ty, box, hitRadius){
+  var corners = [
+    {x: box.x, y: box.y},
+    {x: box.x + box.w, y: box.y},
+    {x: box.x, y: box.y + box.h},
+    {x: box.x + box.w, y: box.y + box.h}
+  ];
+  var t = getTransform();
+  var r = hitRadius / t.scale;
+  for(var i = 0; i < corners.length; i++){
+    if(Math.abs(tx - corners[i].x) < r && Math.abs(ty - corners[i].y) < r){
+      return corners[i];
+    }
+  }
+  return null;
+}
+
+function onMouseDown(e){
+  if(previewMode || !currentTemplate) return;
+  var rect = canvas.getBoundingClientRect();
+  var sx = (e.clientX - rect.left) * (canvas.width / rect.width);
+  var sy = (e.clientY - rect.top) * (canvas.height / rect.height);
+  var pt = screenToTemplate(sx, sy);
+
+  // 先检查落款框手柄
+  if(document.getElementById('showSignature').checked){
+    var sigHandle = getHandleAt(pt.x, pt.y, sigBox, 16);
+    if(sigHandle){
+      resizeTarget = 'sig';
+      dragStartX = pt.x;
+      dragStartY = pt.y;
+      if(sigHandle.x === sigBox.x && sigHandle.y === sigBox.y) resizeCorner = 'nw';
+      else if(sigHandle.x === sigBox.x + sigBox.w && sigHandle.y === sigBox.y) resizeCorner = 'ne';
+      else if(sigHandle.x === sigBox.x && sigHandle.y === sigBox.y + sigBox.h) resizeCorner = 'sw';
+      else resizeCorner = 'se';
+      return;
+    }
+    // 拖拽落款框
+    if(pt.x >= sigBox.x && pt.x <= sigBox.x + sigBox.w && pt.y >= sigBox.y && pt.y <= sigBox.y + sigBox.h){
+      dragTarget = 'sig';
+      dragOffsetX = pt.x - sigBox.x;
+      dragOffsetY = pt.y - sigBox.y;
+      canvas.style.cursor = 'grabbing';
+      return;
+    }
+  }
+
+  // 正文框手柄
+  var textHandle = getHandleAt(pt.x, pt.y, textBox, 16);
+  if(textHandle){
+    resizeTarget = 'text';
+    dragStartX = pt.x;
+    dragStartY = pt.y;
+    if(textHandle.x === textBox.x && textHandle.y === textBox.y) resizeCorner = 'nw';
+    else if(textHandle.x === textBox.x + textBox.w && textHandle.y === textBox.y) resizeCorner = 'ne';
+    else if(textHandle.x === textBox.x && textHandle.y === textBox.y + textBox.h) resizeCorner = 'sw';
+    else resizeCorner = 'se';
+    return;
+  }
+
+  // 拖拽正文框
+  if(pt.x >= textBox.x && pt.x <= textBox.x + textBox.w && pt.y >= textBox.y && pt.y <= textBox.y + textBox.h){
+    dragTarget = 'text';
+    dragOffsetX = pt.x - textBox.x;
+    dragOffsetY = pt.y - textBox.y;
+    canvas.style.cursor = 'grabbing';
+  }
+}
+
+function onMouseMove(e){
+  if(previewMode || !currentTemplate) return;
+  var rect = canvas.getBoundingClientRect();
+  var sx = (e.clientX - rect.left) * (canvas.width / rect.width);
+  var sy = (e.clientY - rect.top) * (canvas.height / rect.height);
+  var pt = screenToTemplate(sx, sy);
+
+  // 拖拽
+  if(dragTarget === 'text'){
+    textBox.x = pt.x - dragOffsetX;
+    textBox.y = pt.y - dragOffsetY;
+    clampBox(textBox);
+    redraw();
+    return;
+  }
+  if(dragTarget === 'sig'){
+    sigBox.x = pt.x - dragOffsetX;
+    sigBox.y = pt.y - dragOffsetY;
+    clampBox(sigBox);
+    redraw();
+    return;
+  }
+
+  // 缩放
+  if(resizeTarget){
+    var dx = pt.x - dragStartX;
+    var dy = pt.y - dragStartY;
+    var box = resizeTarget === 'text' ? textBox : sigBox;
+    var n = {x: box.x, y: box.y, w: box.w, h: box.h};
+    if(resizeCorner === 'nw'){ n.x += dx; n.y += dy; n.w -= dx; n.h -= dy; }
+    else if(resizeCorner === 'ne'){ n.y += dy; n.w += dx; n.h -= dy; }
+    else if(resizeCorner === 'sw'){ n.x += dx; n.w -= dx; n.h += dy; }
+    else if(resizeCorner === 'se'){ n.w += dx; n.h += dy; }
+    if(n.w > 60 && n.h > 30){
+      box.x = n.x; box.y = n.y; box.w = n.w; box.h = n.h;
+      dragStartX = pt.x;
+      dragStartY = pt.y;
+      clampBox(box);
+      redraw();
+    }
+    return;
+  }
+
+  // 悬停光标
+  var showSig = document.getElementById('showSignature').checked;
+  var handle = getHandleAt(pt.x, pt.y, textBox, 16);
+  if(!handle && showSig) handle = getHandleAt(pt.x, pt.y, sigBox, 16);
+
+  var overText = (pt.x >= textBox.x && pt.x <= textBox.x + textBox.w && pt.y >= textBox.y && pt.y <= textBox.y + textBox.h);
+  var overSig = showSig && (pt.x >= sigBox.x && pt.x <= sigBox.x + sigBox.w && pt.y >= sigBox.y && pt.y <= sigBox.y + sigBox.h);
+
+  if(handle) canvas.style.cursor = 'nwse-resize';
+  else if(overText || overSig) canvas.style.cursor = 'move';
+  else canvas.style.cursor = 'default';
+}
+
+function onMouseUp(){
+  dragTarget = null;
+  resizeTarget = null;
+  resizeCorner = '';
+  canvas.style.cursor = 'default';
+}
+
+function onTouchStart(e){ e.preventDefault(); if(e.touches.length===1) onMouseDown({clientX:e.touches[0].clientX,clientY:e.touches[0].clientY}); }
+function onTouchMove(e){ e.preventDefault(); if(e.touches.length===1) onMouseMove({clientX:e.touches[0].clientX,clientY:e.touches[0].clientY}); }
+function onTouchEnd(e){ e.preventDefault(); onMouseUp(); }
+
+// ============ 限制框在画布内 + 避开 avoidArea ============
+function clampBox(box){
+  var tpl = currentTemplate;
+  if(!tpl) return;
+  box.x = Math.max(10, Math.min(box.x, tpl.width - box.w - 10));
+  box.y = Math.max(10, Math.min(box.y, tpl.height - box.h - 10));
+  box.w = Math.max(80, Math.min(box.w, tpl.width - 20));
+  box.h = Math.max(40, Math.min(box.h, tpl.height - 20));
+  if(tpl.avoidArea){
+    var a = tpl.avoidArea;
+    // 如果框和 avoidArea 重叠，把框往上推
+    if(box.y + box.h > a.y && box.x < a.x + a.w && box.x + box.w > a.x && box.y < a.y + a.h){
+      box.y = Math.max(10, a.y - box.h - 20);
+    }
+  }
+}
+
+// ============ 工具栏事件 ============
+function setupToolbarEvents(){
+  var ids = ['fontFamily','fontSize','fontColor','textAlign','lineHeight','fontWeight','sigFontSize'];
+  for(var i = 0; i < ids.length; i++){
+    var el = document.getElementById(ids[i]);
+    el.addEventListener('change', redraw);
+    el.addEventListener('input', redraw);
+  }
+  document.getElementById('showSignature').addEventListener('change', redraw);
+}
+
+// ============ 弹窗逻辑 ============
+function openTextEditor(){
+  document.getElementById('editTextZh').value = userTextZh || '';
+  document.getElementById('editSigText').value = userSigText || '永远爱你的妈妈';
+  document.getElementById('editSigDate').value = userSigDate || new Date().toLocaleDateString('zh-CN').replace(/\//g, '.');
+  document.getElementById('textModal').classList.add('active');
+  setTimeout(function(){ document.getElementById('editTextZh').focus(); }, 100);
+}
+
+function closeTextEditor(){
+  document.getElementById('textModal').classList.remove('active');
+}
+
+function confirmText(){
+  userTextZh = document.getElementById('editTextZh').value.trim();
+  userSigText = document.getElementById('editSigText').value.trim() || '永远爱你的妈妈';
+  userSigDate = document.getElementById('editSigDate').value.trim() || new Date().toLocaleDateString('zh-CN').replace(/\//g, '.');
+  closeTextEditor();
+  redraw();
+  showToast('✅ 文字已更新');
+}
+
+// ============ 预览模式 ============
+function togglePreview(){
+  previewMode = !previewMode;
+  var bar = document.getElementById('previewBar');
+  if(previewMode) bar.classList.add('active');
+  else bar.classList.remove('active');
+  showToast(previewMode ? '👁 预览模式 — 文字已锁定' : '✏️ 已退出预览');
+  redraw();
+}
+
+function exitPreview(){
+  previewMode = false;
+  document.getElementById('previewBar').classList.remove('active');
+  redraw();
+}
+
+// ============ 生成图片（高清输出） ============
+function generateImage(){
+  if(!currentTemplate || !bgImage) return;
+
+  var out = document.createElement('canvas');
+  out.width = currentTemplate.width;
+  out.height = currentTemplate.height;
+  var octx = out.getContext('2d');
+
+  // 画背景
+  octx.drawImage(bgImage, 0, 0);
+
+  var ff = document.getElementById('fontFamily').value;
+  var fs = parseInt(document.getElementById('fontSize').value, 10);
+  var fc = document.getElementById('fontColor').value;
+  var ta = document.getElementById('textAlign').value;
+  var lh = parseFloat(document.getElementById('lineHeight').value);
+  var fw = document.getElementById('fontWeight').value;
+
+  // 画正文
+  octx.font = fw + ' ' + fs + 'px ' + ff;
+  octx.fillStyle = fc;
+  octx.textAlign = ta;
+  octx.textBaseline = 'top';
+
+  var text = userTextZh || '';
+  var paragraphs = text.split('\n');
+  var allLines = [];
+  for(var p = 0; p < paragraphs.length; p++){
+    if(paragraphs[p] === '') allLines.push('');
+    else allLines = allLines.concat(wrapText(octx, paragraphs[p], textBox.w - 24));
+  }
+
+  var startY = textBox.y + 12;
+  var lineH = fs * lh;
+  var afs = fs;
+  var testLines = allLines.slice();
+  while(startY + testLines.length * lineH > textBox.y + textBox.h - 12 && afs > 10){
+    afs--;
+    octx.font = fw + ' ' + afs + 'px ' + ff;
+    testLines = [];
+    for(var p2 = 0; p2 < paragraphs.length; p2++){
+      if(paragraphs[p2] === '') testLines.push('');
+      else testLines = testLines.concat(wrapText(octx, paragraphs[p2], textBox.w - 24));
+    }
+  }
+  octx.font = fw + ' ' + afs + 'px ' + ff;
+  var finalLineH = afs * lh;
+  for(var i = 0; i < testLines.length; i++){
+    var x;
+    if(ta === 'center') x = textBox.x + textBox.w / 2;
+    else if(ta === 'right') x = textBox.x + textBox.w - 12;
+    else x = textBox.x + 12;
+    octx.fillText(testLines[i], x, startY + i * finalLineH);
+  }
+
+  // 画落款
+  if(document.getElementById('showSignature').checked){
+    var sigSel = document.getElementById('sigFontSize').value;
+    var sigFs = fs;
+    if(sigSel !== 'same') sigFs = parseInt(sigSel, 10);
+
+    octx.font = fw + ' ' + sigFs + 'px ' + ff;
+    octx.fillStyle = '#555555';
+    octx.textAlign = ta;
+    octx.textBaseline = 'top';
+
+    var lines = [];
+    if(userSigText) lines.push(userSigText);
+    if(userSigDate) lines.push(userSigDate);
+
+    var sigStartY = sigBox.y + 8;
+    var sigLineH = sigFs * 1.5;
+    for(var si = 0; si < lines.length; si++){
+      var sx;
+      if(ta === 'center') sx = sigBox.x + sigBox.w / 2;
+      else if(ta === 'right') sx = sigBox.x + sigBox.w - 10;
+      else sx = sigBox.x + 10;
+      octx.fillText(lines[si], sx, sigStartY + si * sigLineH);
+    }
+  }
+
+  // 下载
+  var link = document.createElement('a');
+  link.download = '鼓励贴_' + currentTemplate.name + '_' + Date.now() + '.png';
+  link.href = out.toDataURL('image/png');
+  link.click();
+  showToast('✅ 图片已生成并下载！');
+}
+
+// ============ Toast ============
+function showToast(msg){
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 3000);
+}
+
+// ============ 错误提示 ============
+function showError(msg){
+  console.error(msg);
+  var box = document.getElementById('errorBox');
+  box.textContent = '❌ ' + msg;
+  box.classList.add('show');
+  setTimeout(function(){ box.classList.remove('show'); }, 10000);
+}
+
+// ============ 键盘快捷键 ============
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape'){ if(previewMode) exitPreview(); closeTextEditor(); }
+  if(e.key === 'p' || e.key === 'P') togglePreview();
+  if((e.key === 's' || e.key === 'S') && (e.ctrlKey || e.metaKey)){ e.preventDefault(); generateImage(); }
+  if(e.key === 'e' || e.key === 'E') openTextEditor();
+});
+
+// ============ 启动 ============
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
