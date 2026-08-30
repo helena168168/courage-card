@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<base href="/courage-card/">
+<title>鼓励贴生成器</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Microsoft YaHei',sans-serif; background:#f0f2f5; display:flex; height:100vh; overflow:hidden; }
+
+/* 左侧栏 */
+.sidebar { width:220px; background:#fff; border-right:1px solid #e8e8e8; display:flex; flex-direction:column; }
+.logo { padding:16px 12px; font-size:16px; font-weight:bold; border-bottom:1px solid #f0f0f0; display:flex; align-items:center; gap:8px; }
+.logo svg { width:24px; height:24px; }
+.steps { padding:10px 12px; font-size:12px; color:#888; border-bottom:1px solid #f0f0f0; }
+.template-list { flex:1; overflow-y:auto; padding:12px; display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.template-item { border-radius:8px; overflow:hidden; border:2px solid transparent; cursor:pointer; transition:all .2s; }
+.template-item img { width:100%; display:block; aspect-ratio:9/16; object-fit:cover; }
+.template-item span { display:block; font-size:10px; text-align:center; padding:4px 0; color:#555; }
+.template-item:hover { border-color:#4a90d9; }
+.template-item.active { border-color:#ff6b6b; box-shadow:0 0 8px rgba(255,107,107,.4); }
+
+/* 主区 */
+.main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+.toolbar { background:#fff; padding:10px 20px; display:flex; align-items:center; gap:12px; border-bottom:1px solid #e8e8e8; flex-wrap:wrap; }
+.toolbar select, .toolbar input[type=color], .toolbar button { padding:6px 10px; border:1px solid #d9d9d9; border-radius:4px; font-size:14px; outline:none; }
+.toolbar input[type=color] { width:32px; height:32px; padding:2px; cursor:pointer; }
+.btn { padding:6px 16px; border-radius:4px; cursor:pointer; font-size:14px; border:none; color:#fff; display:flex; align-items:center; gap:4px; }
+.btn-edit { background:#ff6b6b; }
+.btn-preview { background:#fff; border:1px solid #4a90d9; color:#4a90d9; }
+.btn-generate { background:#4a90d9; }
+
+.canvas-wrap { flex:1; display:flex; align-items:center; justify-content:center; background:#e8e8e8; position:relative; overflow:hidden; }
+canvas { cursor:default; box-shadow:0 4px 12px rgba(0,0,0,.1); }
+
+/* 预览条 */
+#previewBar { position:fixed; top:0; left:0; right:0; background:#4a90d9; color:#fff; text-align:center; padding:8px; z-index:100; transform:translateY(-100%); transition:transform .3s; }
+#previewBar.active { transform:translateY(0); }
+
+/* Toast */
+#toast { position:fixed; bottom:40px; left:50%; transform:translateX(-50%) translateY(20px); background:rgba(0,0,0,.7); color:#fff; padding:10px 24px; border-radius:20px; opacity:0; transition:all .3s; z-index:200; font-size:14px; }
+#toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+/* 模态框 */
+.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; align-items:center; justify-content:center; z-index:300; }
+.modal-overlay.active { display:flex; }
+.modal-box { background:#fff; border-radius:12px; padding:24px; width:420px; max-width:90vw; box-shadow:0 8px 24px rgba(0,0,0,.15); }
+.modal-title { font-size:18px; font-weight:bold; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+.modal-group { margin-bottom:14px; }
+.modal-group label { display:block; font-size:13px; margin-bottom:6px; color:#333; font-weight:500; }
+.modal-group textarea { width:100%; padding:10px; border:1px solid #d9d9d9; border-radius:6px; font-size:14px; resize:vertical; min-height:80px; font-family:inherit; line-height:1.6; }
+.modal-group input[type=text] { width:100%; padding:10px; border:1px solid #d9d9d9; border-radius:6px; font-size:14px; }
+.modal-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:20px; }
+.btn-cancel { padding:8px 20px; border:1px solid #d9d9d9; background:#fff; border-radius:6px; cursor:pointer; font-size:14px; }
+.btn-confirm { padding:8px 20px; background:#4a90d9; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:14px; }
+.hint-text { font-size:12px; color:#888; margin-top:4px; }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+    鼓励贴生成器
+  </div>
+  <div class="steps">选择模板 → 编辑文字 → 一键生成</div>
+  <div class="template-list" id="templateList"></div>
+</div>
+
+<div class="main">
+  <div class="toolbar">
+    <select id="fontFamily">
+      <option value="Microsoft YaHei">微软雅黑</option>
+      <option value="SimSun">宋体</option>
+      <option value="KaiTi">楷体</option>
+      <option value="Arial">Arial</option>
+      <option value="Georgia">Georgia</option>
+      <option value="仓耳舒圆">仓耳舒圆</option>
+    </select>
+    <select id="fontSize">
+      <option value="25">25px</option>
+      <option value="26">26px</option>
+      <option value="27">27px</option>
+      <option value="28">28px</option>
+      <option value="29">29px</option>
+      <option value="30">30px</option>
+      <option value="31">31px</option>
+      <option value="32">32px</option>
+      <option value="33">33px</option>
+      <option value="34">34px</option>
+      <option value="35">35px</option>
+      <option value="36">36px</option>
+      <option value="37">37px</option>
+      <option value="38">38px</option>
+      <option value="39">39px</option>
+      <option value="40">40px</option>
+      <option value="41">41px</option>
+      <option value="42">42px</option>
+      <option value="43">43px</option>
+      <option value="44">44px</option>
+      <option value="45" selected>45px</option>
+      <option value="46">46px</option>
+      <option value="47">47px</option>
+      <option value="48">48px</option>
+      <option value="49">49px</option>
+      <option value="50">50px</option>
+      <option value="51">51px</option>
+      <option value="52">52px</option>
+      <option value="53">53px</option>
+      <option value="54">54px</option>
+      <option value="55">55px</option>
+      <option value="56">56px</option>
+      <option value="57">57px</option>
+      <option value="58">58px</option>
+      <option value="59">59px</option>
+      <option value="60">60px</option>
+      <option value="61">61px</option>
+      <option value="62">62px</option>
+      <option value="63">63px</option>
+      <option value="64">64px</option>
+      <option value="65">65px</option>
+    </select>
+    <input type="color" id="fontColor" value="#000000">
+    <select id="textAlign">
+      <option value="left" selected>左对齐</option>
+      <option value="center">居中</option>
+      <option value="right">右对齐</option>
+    </select>
+    <select id="lineHeight">
+      <option value="1.4">1.4</option>
+      <option value="1.5">1.5</option>
+      <option value="1.55" selected>1.55</option>
+      <option value="1.6">1.6</option>
+      <option value="1.8">1.8</option>
+      <option value="2.0">2.0</option>
+    </select>
+    <select id="fontWeight">
+      <option value="normal">普通</option>
+      <option value="bold">加粗</option>
+    </select>
+    <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;">
+      <input type="checkbox" id="showSignature" checked> 落款
+    </label>
+    <select id="sigFontSize">
+      <option value="same">同正文</option>
+      <option value="20">20px</option>
+      <option value="24">24px</option>
+      <option value="28" selected>28px</option>
+      <option value="32">32px</option>
+      <option value="36">36px</option>
+      <option value="40">40px</option>
+      <option value="45">45px</option>
+      <option value="50">50px</option>
+    </select>
+    <button class="btn btn-edit" onclick="openTextEditor()">✏️ 编辑文字</button>
+    <button class="btn btn-preview" onclick="togglePreview()">👁 预览</button>
+    <button class="btn btn-generate" onclick="generateImage()">💾 生成图片</button>
+  </div>
+  <div class="canvas-wrap" id="canvasWrap">
+    <canvas id="canvas"></canvas>
+  </div>
+  <div id="previewBar">👁 预览模式 — 文字已锁定（按 P 或 Esc 退出）</div>
+</div>
+
+<!-- 编辑文字弹窗 -->
+<div class="modal-overlay" id="textModal">
+  <div class="modal-box">
+    <div class="modal-title">✏️ 编辑文字内容</div>
+    <div class="modal-group">
+      <label for="editTextZh">📝 正文内容（支持按回车换行）</label>
+      <textarea id="editTextZh" placeholder="亲爱的XXX：&#10;每一次尝试都有意义..."></textarea>
+      <div class="hint-text">💡 提示：在输入框中按回车键即可实现换行。</div>
+    </div>
+    <div class="modal-group">
+      <label for="editSigText">✍️ 落款文字</label>
+      <input type="text" id="editSigText" placeholder="永远爱你的妈妈">
+    </div>
+    <div class="modal-group">
+      <label for="editSigDate">📅 落款日期</label>
+      <input type="text" id="editSigDate">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeTextEditor()">取消</button>
+      <button class="btn-confirm" onclick="confirmText()">确认</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ============ 全局状态 ============
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const wrap = document.getElementById('canvasWrap');
+let currentTemplate = null;
+let bgImage = null;
+let previewMode = false;
+let textBox = { x:0, y:0, w:0, h:0 };
+let sigBox = { x:0, y:0, w:0, h:0 };
+let userTextZh = '';
+let userSigText = '永远爱你的妈妈';
+let userSigDate = new Date().toLocaleDateString('zh-CN').replace(/\//g, '.');
+let dragTarget = null;
+let dragOffset = { x:0, y:0 };
+
+// ============ 模板数据 ============
+const templates = [
+  { id:"01", name:"绿色星空小巫师", file:"images/01_wizard_green.png", width:562, height:1000, avoidArea:{ x:0, y:650, w:562, h:350 } },
+  { id:"02", name:"暖黄魔法小巫师", file:"images/02_wizard_yellow.png", width:562, height:1000, avoidArea:{ x:0, y:650, w:562, h:350 } },
+  { id:"03", name:"粉色樱花小巫师", file:"images/03_wizard_pink.png", width:562, height:1000, avoidArea:{ x:0, y:650, w:562, h:350 } },
+  { id:"04", name:"蓝天雨滴小巫师", file:"images/04_wizard_blue.png", width:562, height:1000, avoidArea:{ x:0, y:650, w:562, h:350 } },
+  { id:"05", name:"暖橙阳光小巫师", file:"images/05_wizard_orange.png", width:562, height:1000, avoidArea:{ x:0, y:650, w:562, h:350 } },
+  { id:"06", name:"梦幻紫色小巫师", file:"images/06_wizard_purple.png", width:562, height:1000, avoidArea:{ x:0, y:650, w:562, h:350 } },
+  { id:"07", name:"薄荷绿叶小巫师", file:"images/07_wizard_mint.png", width:562, height:1000, avoidArea:{ x:0, y:650, w:562, h:350 } },
+  { id:"08", name:"冰雪蓝星小巫师", file:"images/08_wizard_ice.png", width:562, height:1000, avoidArea:{ x:0, y:650, w:562, h:350 } },
+  { id:"09", name:"黄昏晚霞小巫师", file:"images/09_wizard_sunset.png", width:562, height:1000, avoidArea:{ x:0, y:650, w:562, h:350 } },
+  { id:"10", name:"海洋波浪小巫师", file:"images/10_wizard_ocean.png", width:562, height:1000, avoidArea:{ x:0, y:650, w:562, h:350 } },
+  { id:"11", name:"薰衣草紫小巫师", file:"images/11_wizard_lavender.png", width:562, height:1000, avoidArea:{ x:0, y:650, w:562, h:350 } },
+  { id:"12", name:"糖果彩虹小巫师", file:"images/12_wizard_rainbow.png", width:562, height:1000, avoidArea:{ x:0, y:650, w:562, h:350 } },
+  { id:"13", name:"森林绿野小巫师", file:"images/13_wizard_forest.png", width:562, height:1000, avoidArea:{ x:0, y:650, w:562, h:350 } },
+  { id:"14", name:"柠檬微风小巫师", file:"images/14_wizard_lemon.png", width:562, height:1000, avoidArea:{ x:0, y:650, w:562, h:350 } },
+  { id:"15", name:"玫瑰花园小巫师", file:"images/15_wizard_rose.png", width:562, height:1000, avoidArea:{ x:0, y:650, w:562, h:350 } },
+  { id:"16", name:"星空银河小巫师", file:"images/16_wizard_galaxy.png", width:562, height:1000, avoidArea:{ x:0, y:650, w:562, h:350 } },
+  { id:"17", name:"云朵棉花糖小巫师", file:"images/17_wizard_cloud.png", width:562, height:1000, avoidArea:{ x:0, y:650, w:562, h:350 } },
+  { id:"18", name:"枫叶秋天小巫师", file:"images/18_wizard_maple.png", width:562, height:1000, avoidArea:{ x:0, y:650, w:562, h:350 } },
+  { id:"19", name:"糖果条纹小巫师", file:"images/19_wizard_stripe.png", width:562, height:1000, avoidArea:{ x:0, y:650, w:562, h:350 } },
+  { id:"20", name:"极光幻境小巫师", file:"images/20_wizard_aurora.png", width:562, height:1000, avoidArea:{ x:0, y:650, w:562, h:350 } },
+  { id:"21", name:"巧克力甜心小巫师", file:"images/21_wizard_choco.png", width:562, height:1000, avoidArea:{ x:0, y:650, w:562, h:350 } },
+  { id:"22", name:"青柠苏打小巫师", file:"images/22_wizard_lime.png", width:562, height:1000, avoidArea:{ x:0, y:650, w:562, h:350 } },
+  { id:"23", name:"蜜桃气泡小巫师", file:"images/23_wizard_peach.png", width:562, height:1000, avoidArea:{ x:0, y:650, w:562, h:350 } },
+  { id:"24", name:"夜空流星小巫师", file:"images/24_wizard_meteor.png", width:562, height:1000, avoidArea:{ x:0, y:650, w:562, h:350 } }
+];
+
+// ============ 初始化 ============
+function init(){
+  renderTemplates();
+  selectTemplate(templates[0]);
+  document.getElementById('editSigDate').value = userSigDate;
+  document.getElementById('fontSize').value = '45';
+  document.getElementById('textAlign').value = 'left';
+  document.getElementById('lineHeight').value = '1.55';
+}
+
+function renderTemplates(){
+  const list = document.getElementById('templateList');
+  templates.forEach(t => {
+    const div = document.createElement('div');
+    div.className = 'template-item';
+    div.innerHTML = `<img src="${t.file}" loading="lazy" alt="${t.name}"><span>${t.name}</span>`;
+    div.onclick = () => selectTemplate(t);
+    list.appendChild(div);
+  });
+}
+
+function selectTemplate(t){
+  currentTemplate = t;
+  document.querySelectorAll('.template-item').forEach(el => el.classList.remove('active'));
+  event.target.closest('.template-item').classList.add('active');
+  bgImage = new Image();
+  bgImage.onload = () => {
+    resizeCanvas();
+    resetBoxes();
+    redraw();
+  };
+  bgImage.src = t.file;
+}
+
+// ============ 画布与默认位置 ============
+function resizeCanvas(){
+  if(!bgImage) return;
+  canvas.width = currentTemplate.width;
+  canvas.height = currentTemplate.height;
+}
+
+function resetBoxes(){
+  const W = canvas.width, H = canvas.height;
+  // 正文框：信纸安全区
+  textBox = {
+    x: Math.round(W * 0.185),
+    y: Math.round(H * 0.205),
+    w: Math.round(W * 0.605),
+    h: Math.round(H * 0.385)
+  };
+  // 落款框：正文下方偏左
+  sigBox = {
+    x: Math.round(W * 0.345),
+    y: Math.round(H * 0.695),
+    w: Math.round(W * 0.215),
+    h: Math.round(H * 0.055)
+  };
+}
+
+// ============ 绘制 ============
+function redraw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(!bgImage) return;
+  ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
+
+  // 正文
+  drawTextInBox();
+
+  // 落款
+  if(document.getElementById('showSignature').checked){
+    drawSignature();
+  }
+
+  // 编辑模式：画虚线框和手柄
+  if(!previewMode){
+    drawBox(textBox, '#4a90d9');
+    if(document.getElementById('showSignature').checked) drawBox(sigBox, '#e76f51');
+  }
+}
+
+function drawBox(box, color){
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.setLineDash([8,4]);
+  ctx.strokeRect(box.x, box.y, box.w, box.h);
+  ctx.setLineDash([]);
+  ctx.fillStyle = color;
+  const handles = getHandles(box);
+  handles.forEach(h => { ctx.beginPath(); ctx.arc(h.x, h.y, 8, 0, Math.PI*2); ctx.fill(); });
+}
+
+function getHandles(box){
+  return [
+    {x:box.x,y:box.y},{x:box.x+box.w,y:box.y},
+    {x:box.x,y:box.y+box.h},{x:box.x+box.w,y:box.y+box.h}
+  ];
+}
+
+function drawTextInBox(){
+  const ff = document.getElementById('fontFamily').value;
+  const fs = parseInt(document.getElementById('fontSize').value);
+  const fc = document.getElementById('fontColor').value;
+  const ta = document.getElementById('textAlign').value;
+  const lh = parseFloat(document.getElementById('lineHeight').value);
+  const fw = document.getElementById('fontWeight').value;
+
+  ctx.font = `${fw} ${fs}px ${ff}`;
+  ctx.fillStyle = fc;
+  ctx.textAlign = ta;
+  ctx.textBaseline = 'top';
+
+  const text = userTextZh || '点击上方"编辑文字"输入内容...';
+  const manualLines = text.split('\n');
+  let lines = [];
+  manualLines.forEach(line => { lines = lines.concat(wrapText(ctx, line, textBox.w - 20)); });
+
+  const startY = textBox.y + 10;
+  const lineH = fs * lh;
+  lines.forEach((line, i) => {
+    let x = ta === 'center' ? textBox.x + textBox.w/2 : ta === 'right' ? textBox.x + textBox.w - 10 : textBox.x + 10;
+    ctx.fillText(line, x, startY + i * lineH);
+  });
+}
+
+function drawSignature(){
+  const ff = document.getElementById('fontFamily').value;
+  const fw = document.getElementById('fontWeight').value;
+  const sigSel = document.getElementById('sigFontSize').value;
+  let sigFs = parseInt(document.getElementById('fontSize').value);
+  if(sigSel !== 'same') sigFs = parseInt(sigSel);
+
+  ctx.font = `${fw} ${sigFs}px ${ff}`;
+  ctx.fillStyle = '#666';
+  ctx.textAlign = document.getElementById('textAlign').value;
+  ctx.textBaseline = 'top';
+
+  const lines = [userSigText || '永远爱你的妈妈'];
+  if(userSigDate) lines.push(userSigDate);
+  const startY = sigBox.y + 10;
+  const lineH = sigFs * 1.5;
+  lines.forEach((line, i) => {
+    let x = ctx.textAlign === 'center' ? sigBox.x + sigBox.w/2 : ctx.textAlign === 'right' ? sigBox.x + sigBox.w - 10 : sigBox.x + 10;
+    ctx.fillText(line, x, startY + i * lineH);
+  });
+}
+
+function wrapText(context, text, maxWidth){
+  if(!text) return [];
+  const chars = text.split('');
+  let lines = [], line = '';
+  for(let i=0; i<chars.length; i++){
+    const test = line + chars[i];
+    if(context.measureText(test).width > maxWidth && line !== ''){
+      lines.push(line); line = chars[i];
+    } else { line = test; }
+  }
+  lines.push(line);
+  return lines;
+}
+
+// ============ 拖拽交互 ============
+canvas.addEventListener('mousedown', e => {
+  if(previewMode) return;
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const mx = (e.clientX - rect.left) * scaleX;
+  const my = (e.clientY - rect.top) * scaleY;
+
+  if(hitBox(mx, my, textBox)){ dragTarget = textBox; dragOffset = { x: mx - textBox.x, y: my - textBox.y }; }
+  else if(hitBox(mx, my, sigBox)){ dragTarget = sigBox; dragOffset = { x: mx - sigBox.x, y: my - sigBox.y }; }
+});
+
+canvas.addEventListener('mousemove', e => {
+  if(!dragTarget) return;
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  dragTarget.x = (e.clientX - rect.left) * scaleX - dragOffset.x;
+  dragTarget.y = (e.clientY - rect.top) * scaleY - dragOffset.y;
+  redraw();
+});
+
+canvas.addEventListener('mouseup', () => { dragTarget = null; });
+canvas.addEventListener('mouseleave', () => { dragTarget = null; });
+
+function hitBox(mx, my, box){
+  return mx >= box.x && mx <= box.x + box.w && my >= box.y && my <= box.y + box.h;
+}
+
+// ============ 弹窗 ============
+function openTextEditor(){
+  document.getElementById('editTextZh').value = userTextZh;
+  document.getElementById('editSigText').value = userSigText;
+  document.getElementById('editSigDate').value = userSigDate;
+  document.getElementById('textModal').classList.add('active');
+  setTimeout(() => document.getElementById('editTextZh').focus(), 100);
+}
+function closeTextEditor(){ document.getElementById('textModal').classList.remove('active'); }
+function confirmText(){
+  userTextZh = document.getElementById('editTextZh').value;
+  userSigText = document.getElementById('editSigText').value;
+  userSigDate = document.getElementById('editSigDate').value;
+  closeTextEditor();
+  redraw();
+  showToast('✅ 文字已更新');
+}
+
+// ============ 生成图片 ============
+function generateImage(){
+  if(!bgImage) return;
+  const out = document.createElement('canvas');
+  out.width = canvas.width; out.height = canvas.height;
+  const octx = out.getContext('2d');
+  octx.drawImage(bgImage, 0, 0);
+
+  // 高清正文
+  const ff = document.getElementById('fontFamily').value;
+  const fs = parseInt(document.getElementById('fontSize').value);
+  const fc = document.getElementById('fontColor').value;
+  const ta = document.getElementById('textAlign').value;
+  const lh = parseFloat(document.getElementById('lineHeight').value);
+  const fw = document.getElementById('fontWeight').value;
+  octx.font = `${fw} ${fs}px ${ff}`;
+  octx.fillStyle = fc; octx.textAlign = ta; octx.textBaseline = 'top';
+  const text = userTextZh || '';
+  const manualLines = text.split('\n');
+  let lines = [];
+  manualLines.forEach(line => { lines = lines.concat(wrapText(octx, line, textBox.w - 20)); });
+  const startY = textBox.y + 10;
+  const lineH = fs * lh;
+  lines.forEach((line, i) => {
+    let x = ta === 'center' ? textBox.x + textBox.w/2 : ta === 'right' ? textBox.x + textBox.w - 10 : textBox.x + 10;
+    octx.fillText(line, x, startY + i * lineH);
+  });
+
+  // 高清落款
+  if(document.getElementById('showSignature').checked){
+    const sigSel = document.getElementById('sigFontSize').value;
+    let sigFs = fs;
+    if(sigSel !== 'same') sigFs = parseInt(sigSel);
+    octx.font = `${fw} ${sigFs}px ${ff}`;
+    octx.fillStyle = '#666'; octx.textAlign = ta; octx.textBaseline = 'top';
+    const sigLines = [userSigText || '永远爱你的妈妈'];
+    if(userSigDate) sigLines.push(userSigDate);
+    const sy = sigBox.y + 10;
+    const slh = sigFs * 1.5;
+    sigLines.forEach((line, i) => {
+      let x = ta === 'center' ? sigBox.x + sigBox.w/2 : ta === 'right' ? sigBox.x + sigBox.w - 10 : sigBox.x + 10;
+      octx.fillText(line, x, sy + i * slh);
+    });
+  }
+
+  const link = document.createElement('a');
+  link.download = `鼓励贴_${currentTemplate.name}_${Date.now()}.png`;
+  link.href = out.toDataURL('image/png');
+  link.click();
+  showToast('✅ 图片已生成并下载！');
+}
+
+function togglePreview(){
+  previewMode = !previewMode;
+  document.getElementById('previewBar').classList.toggle('active', previewMode);
+  redraw();
+}
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape' || e.key === 'p' || e.key === 'P'){ previewMode = false; document.getElementById('previewBar').classList.remove('active'); redraw(); }
+});
+
+init();
+</script>
+</body>
+</html>
