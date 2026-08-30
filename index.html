@@ -179,13 +179,13 @@ const templates = [
   { id:"24", name:"夜空流星小巫师", file:"images/24_wizard_meteor.png", width:562, height:1000 }
 ];
 
-// ============ 字号下拉填充（25~65） ============
+// ============ 字号下拉填充（12~65） ============
 (function fillFontSize(){
   const sel = document.getElementById('fontSize');
-  for(let i=25;i<=65;i++){
+  for(let i=12;i<=65;i++){
     const o=document.createElement('option');
     o.value=i; o.text=i+'px';
-    if(i===45) o.selected=true;
+    if(i===35) o.selected=true;
     sel.appendChild(o);
   }
 })();
@@ -194,7 +194,7 @@ const templates = [
   const same=document.createElement('option');
   same.value='same'; same.text='同正文'; same.selected=true;
   sel.appendChild(same);
-  for(let i=20;i<=50;i+=2){
+  for(let i=12;i<=50;i+=2){
     const o=document.createElement('option');
     o.value=i; o.text=i+'px';
     if(i===28) o.selected=true;
@@ -207,7 +207,7 @@ function init(){
   renderTemplates();
   selectTemplate(templates[0]);
   document.getElementById('editSigDate').value = userSigDate;
-  document.getElementById('fontSize').value = '45';
+  document.getElementById('fontSize').value = '35';
   document.getElementById('textAlign').value = 'left';
   document.getElementById('lineHeight').value = '1.55';
 }
