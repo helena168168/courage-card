@@ -1,0 +1,414 @@
+<script>
+(() => {
+  const canvas = document.getElementById('cardCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = 720, H = 1280;
+  canvas.width = W; canvas.height = H;
+
+  const templates = [
+    { name: '魔法小巫师·彩虹', src: 'images/01_wizard_green.png', avoidRect: { x: 60, y: 900, w: 380, h: 230 } },
+    { name: '魔法小巫师·星星', src: 'images/02_wizard_stars.png', avoidRect: { x: 60, y: 900, w: 380, h: 230 } },
+    { name: '魔法小巫师·月亮', src: 'images/03_wizard_moon.png', avoidRect: { x: 60, y: 900, w: 380, h: 230 } },
+    { name: '魔法小巫师·云朵', src: 'images/04_wizard_cloud.png', avoidRect: { x: 60, y: 900, w: 380, h: 230 } },
+    { name: '魔法小巫师·泡泡', src: 'images/05_wizard_bubble.png', avoidRect: { x: 60, y: 900, w: 380, h: 230 } },
+    { name: '魔法小巫师·花花', src: 'images/06_wizard_flower.png', avoidRect: { x: 60, y: 900, w: 380, h: 230 } },
+    { name: '魔法小巫师·流星', src: 'images/07_wizard_meteor.png', avoidRect: { x: 60, y: 900, w: 380, h: 230 } },
+    { name: '魔法小巫师·梦境', src: 'images/08_wizard_dream.png', avoidRect: { x: 60, y: 900, w: 380, h: 230 } },
+    { name: '魔法小巫师·晨光', src: 'images/09_wizard_sun.png', avoidRect: { x: 60, y: 900, w: 380, h: 230 } },
+    { name: '魔法小巫师·夜星', src: 'images/10_wizard_night.png', avoidRect: { x: 60, y: 900, w: 380, h: 230 } },
+    { name: '魔法小巫师·风车', src: 'images/11_wizard_pinwheel.png', avoidRect: { x: 60, y: 900, w: 380, h: 230 } },
+    { name: '魔法小巫师·糖果', src: 'images/12_wizard_candy.png', avoidRect: { x: 60, y: 900, w: 380, h: 230 } },
+    { name: '小鸭魔法师·彩虹', src: 'images/13_duck_rainbow.png', avoidRect: { x: 60, y: 920, w: 400, h: 220 } },
+    { name: '小鸭魔法师·星星', src: 'images/14_duck_stars.png', avoidRect: { x: 60, y: 920, w: 400, h: 220 } },
+    { name: '小鸭魔法师·月亮', src: 'images/15_duck_moon.png', avoidRect: { x: 60, y: 920, w: 400, h: 220 } },
+    { name: '小鸭魔法师·云朵', src: 'images/16_duck_cloud.png', avoidRect: { x: 60, y: 920, w: 400, h: 220 } },
+    { name: '小鸭魔法师·泡泡', src: 'images/17_duck_bubble.png', avoidRect: { x: 60, y: 920, w: 400, h: 220 } },
+    { name: '小鸭魔法师·花花', src: 'images/18_duck_flower.png', avoidRect: { x: 60, y: 920, w: 400, h: 220 } },
+    { name: '小鸭魔法师·流星', src: 'images/19_duck_meteor.png', avoidRect: { x: 60, y: 920, w: 400, h: 220 } },
+    { name: '小鸭魔法师·梦境', src: 'images/20_duck_dream.png', avoidRect: { x: 60, y: 920, w: 400, h: 220 } },
+    { name: '小鸭魔法师·晨光', src: 'images/21_duck_sun.png', avoidRect: { x: 60, y: 920, w: 400, h: 220 } },
+    { name: '小鸭魔法师·夜星', src: 'images/22_duck_night.png', avoidRect: { x: 60, y: 920, w: 400, h: 220 } },
+    { name: '小鸭魔法师·风车', src: 'images/23_duck_pinwheel.png', avoidRect: { x: 60, y: 920, w: 400, h: 220 } },
+    { name: '小鸭魔法师·糖果', src: 'images/24_duck_candy.png', avoidRect: { x: 60, y: 920, w: 400, h: 220 } }
+  ];
+
+  let currentTemplate = templates[0];
+  let bgImage = null;
+  let bgLoaded = false;
+
+  let userTextZh = '加油，你会闪闪发光。\n每一步都算数，每一个小小的坚持，都在把未来点亮。';
+  let userSigText = '永远爱你的妈妈';
+  let userSigDate = '2026.8.31';
+
+  const textBox = { x: 95, y: 150, w: 530, h: 760 };
+  const sigBox = { x: 230, y: 990, w: 260, h: 70 };
+
+  let previewMode = false;
+  let dragTarget = null;
+  let dragAction = null;
+  let dragOffset = { x: 0, y: 0 };
+
+  const ui = {
+    fontSize: document.getElementById('fontSize'),
+    fontFamily: document.getElementById('fontFamily'),
+    fontColor: document.getElementById('fontColor'),
+    lineHeight: document.getElementById('lineHeight'),
+    align: document.getElementById('align'),
+    autoFitText: document.getElementById('autoFitText'),
+    showSignature: document.getElementById('showSignature'),
+    sigFontSize: document.getElementById('sigFontSize'),
+    sigSameAsBody: document.getElementById('sigSameAsBody'),
+    templateList: document.getElementById('templateList')
+  };
+
+  function getFontStr(size, family) {
+    return `${size}px ${family}`;
+  }
+
+  function wrapByCharAndWidth(context, text, maxWidth) {
+    const lines = [];
+    const paragraphs = String(text).split(/\n/);
+    for (const para of paragraphs) {
+      if (!para) { lines.push(''); continue; }
+      let current = '';
+      for (const ch of para) {
+        const test = current + ch;
+        if (context.measureText(test).width > maxWidth && current) {
+          lines.push(current);
+          current = ch;
+        } else {
+          current = test;
+        }
+      }
+      lines.push(current);
+    }
+    return lines;
+  }
+
+  function effectiveLineWidthForIndex(box, lineIndex, fontSize, lineHeightMul, avoid) {
+    if (!avoid) return box.w;
+    const lh = fontSize * lineHeightMul;
+    const y0 = box.y + lineIndex * lh;
+    const y1 = y0 + lh;
+    const overlapY = y1 > avoid.y && y0 < avoid.y + avoid.h;
+    const overlapX = avoid.x >= box.x && avoid.x < box.x + box.w;
+    if (overlapY && overlapX) {
+      return Math.max(80, avoid.x - box.x - 14);
+    }
+    return box.w;
+  }
+
+  function canFit(context, text, box, fontSize, lineHeightMul, avoid) {
+    context.font = getFontStr(fontSize, ui.fontFamily.value);
+    const lines = wrapByCharAndWidth(context, text, box.w);
+    const lh = fontSize * lineHeightMul;
+    if (lines.length * lh > box.h) return false;
+    for (let i = 0; i < lines.length; i++) {
+      const maxW = effectiveLineWidthForIndex(box, i, fontSize, lineHeightMul, avoid);
+      if (context.measureText(lines[i]).width > maxW + 0.5) return false;
+    }
+    return true;
+  }
+
+  function calcAutoFontSize(text, box, family, lineHeightMul, avoid, minSize = 25, maxSize = 65) {
+    const tmp = document.createElement('canvas').getContext('2d');
+    tmp.font = getFontStr(maxSize, family);
+    if (canFit(tmp, text, box, maxSize, lineHeightMul, avoid)) return maxSize;
+
+    let lo = minSize, hi = maxSize, best = minSize;
+    for (let i = 0; i < 18; i++) {
+      const mid = (lo + hi) / 2;
+      if (canFit(tmp, text, box, mid, lineHeightMul, avoid)) {
+        best = mid;
+        lo = mid;
+      } else {
+        hi = mid;
+      }
+    }
+    return Math.floor(best);
+  }
+
+  function drawBodyText(context, text, box, fontSize, lineHeightMul, align, color, avoid) {
+    context.save();
+    context.fillStyle = color;
+    context.font = getFontStr(fontSize, ui.fontFamily.value);
+    context.textBaseline = 'top';
+    context.textAlign = align === '居中' ? 'center' : align === '右对齐' ? 'right' : 'left';
+
+    context.beginPath();
+    context.rect(box.x, box.y, box.w, box.h);
+    context.clip();
+
+    const lines = wrapByCharAndWidth(context, text, box.w);
+    const lh = fontSize * lineHeightMul;
+
+    lines.forEach((line, i) => {
+      const y = box.y + i * lh;
+      let x = box.x;
+      if (align === '居中') x = box.x + box.w / 2;
+      else if (align === '右对齐') x = box.x + box.w;
+
+      const maxW = effectiveLineWidthForIndex(box, i, fontSize, lineHeightMul, avoid);
+      context.save();
+      context.beginPath();
+      context.rect(box.x, box.y + i * lh, maxW, lh);
+      context.clip();
+      context.fillText(line, x, y);
+      context.restore();
+    });
+
+    context.restore();
+  }
+
+  function drawSignature(context, family, color) {
+    if (!ui.showSignature.checked) return;
+    const bodyFs = parseInt(ui.fontSize.value, 10) || 45;
+    let sfs = parseInt(ui.sigFontSize.value, 10) || 32;
+    if (ui.sigSameAsBody.checked) sfs = Math.max(18, Math.floor(bodyFs * 0.72));
+
+    context.save();
+    context.fillStyle = color;
+    context.font = getFontStr(sfs, family);
+    context.textBaseline = 'top';
+    context.textAlign = 'center';
+    context.fillText(userSigText, sigBox.x + sigBox.w / 2, sigBox.y);
+
+    context.font = getFontStr(Math.max(12, sfs - 4), family);
+    context.fillText(userSigDate, sigBox.x + sigBox.w / 2, sigBox.y + sfs * 1.15);
+    context.restore();
+  }
+
+  function drawBoxHandle(c, b, label) {
+    c.save();
+    c.strokeStyle = '#2f80ed';
+    c.lineWidth = 1.5;
+    c.setLineDash([6, 4]);
+    c.strokeRect(b.x, b.y, b.w, b.h);
+    c.setLineDash([]);
+    c.fillStyle = '#2f80ed';
+    c.beginPath();
+    c.arc(b.x + b.w, b.y + b.h, 7, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = '#2f80ed';
+    c.font = '12px 微软雅黑';
+    c.textAlign = 'left';
+    c.textBaseline = 'top';
+    c.fillText(label, b.x + 4, b.y + 4);
+    c.restore();
+  }
+
+  function drawAll(c, forExport = false) {
+    c.clearRect(0, 0, W, H);
+
+    if (bgLoaded && bgImage) {
+      c.drawImage(bgImage, 0, 0, W, H);
+    } else {
+      c.fillStyle = '#fffafd';
+      c.fillRect(0, 0, W, H);
+      c.fillStyle = '#b35a8a';
+      c.font = '28px 微软雅黑';
+      c.textBaseline = 'middle';
+      c.textAlign = 'center';
+      c.fillText('背景图加载中/未加载', W / 2, 80);
+    }
+
+    const family = ui.fontFamily.value;
+    const lh = parseFloat(ui.lineHeight.value) || 1.55;
+    const avoid = currentTemplate?.avoidRect || null;
+
+    let fs = parseInt(ui.fontSize.value, 10) || 45;
+
+    if (ui.autoFitText.checked) {
+      fs = calcAutoFontSize(userTextZh, textBox, family, lh, avoid);
+      if (!forExport) {
+        if (parseInt(ui.fontSize.value, 10) !== fs) {
+          ui.fontSize.value = fs;
+        }
+      }
+    }
+
+    drawBodyText(c, userTextZh, textBox, fs, lh, ui.align.value, ui.fontColor.value, avoid);
+    drawSignature(c, family, ui.fontColor.value);
+
+    if (!forExport && !previewMode) {
+      drawBoxHandle(c, textBox, '正文框');
+      drawBoxHandle(c, sigBox, '签名框');
+    }
+  }
+
+  let rafPending = false;
+  function redraw() {
+    if (rafPending) return;
+    rafPending = true;
+    requestAnimationFrame(() => {
+      rafPending = false;
+      drawAll(ctx, false);
+    });
+  }
+
+  function loadBg(template) {
+    bgLoaded = false;
+    bgImage = null;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      bgImage = img;
+      bgLoaded = true;
+      redraw();
+    };
+    img.onerror = () => {
+      bgImage = null;
+      bgLoaded = false;
+      redraw();
+    };
+    img.src = template.src;
+  }
+
+  function initTemplates() {
+    ui.templateList.innerHTML = '';
+    templates.forEach((t, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'thumb' + (i === 0 ? ' active' : '');
+      btn.title = t.name;
+
+      const im = new Image();
+      im.loading = 'lazy';
+      im.alt = t.name;
+      im.src = t.src;
+      im.onerror = () => { im.style.background = '#ffe4ec'; im.alt = '图失败'; };
+
+      btn.appendChild(im);
+      btn.onclick = () => {
+        document.querySelectorAll('.thumb').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentTemplate = t;
+        loadBg(t);
+      };
+      ui.templateList.appendChild(btn);
+    });
+  }
+
+  function init() {
+    initTemplates();
+    loadBg(currentTemplate);
+
+    ['fontSize','fontFamily','fontColor','lineHeight','align','autoFitText','showSignature','sigFontSize','sigSameAsBody']
+      .forEach(id => {
+        const el = ui[id];
+        if (!el) return;
+        el.addEventListener('input', redraw);
+        el.addEventListener('change', redraw);
+      });
+
+    redraw();
+  }
+
+  // ============ 拖拽 ============
+  canvas.addEventListener('mousedown', e => {
+    if (previewMode) return;
+    const rect = canvas.getBoundingClientRect();
+    const sx = W / rect.width, sy = H / rect.height;
+    const mx = (e.clientX - rect.left) * sx, my = (e.clientY - rect.top) * sy;
+    const handleR = 18;
+
+    const tr = textBox, sr = sigBox;
+
+    if (Math.hypot(mx - (tr.x + tr.w), my - (tr.y + tr.h)) <= handleR) {
+      dragTarget = tr; dragAction = 'resize';
+    } else if (Math.hypot(mx - (sr.x + sr.w), my - (sr.y + sr.h)) <= handleR) {
+      dragTarget = sr; dragAction = 'resize';
+    } else if (mx >= tr.x && mx <= tr.x + tr.w && my >= tr.y && my <= tr.y + tr.h) {
+      dragTarget = tr; dragAction = 'move';
+      dragOffset = { x: mx - tr.x, y: my - tr.y };
+    } else if (mx >= sr.x && mx <= sr.x + sr.w && my >= sr.y && my <= sr.y + sr.h) {
+      dragTarget = sr; dragAction = 'move';
+      dragOffset = { x: mx - sr.x, y: my - sr.y };
+    }
+  });
+
+  canvas.addEventListener('mousemove', e => {
+    if (!dragTarget) return;
+    const rect = canvas.getBoundingClientRect();
+    const sx = W / rect.width, sy = H / rect.height;
+    const mx = (e.clientX - rect.left) * sx, my = (e.clientY - rect.top) * sy;
+
+    if (dragAction === 'move') {
+      dragTarget.x = mx - dragOffset.x;
+      dragTarget.y = my - dragOffset.y;
+    } else if (dragAction === 'resize') {
+      dragTarget.w = Math.max(120, mx - dragTarget.x);
+      dragTarget.h = Math.max(80, my - dragTarget.y);
+    }
+    redraw();
+  });
+
+  canvas.addEventListener('mouseup', () => { dragTarget = null; dragAction = null; });
+  canvas.addEventListener('mouseleave', () => { dragTarget = null; dragAction = null; });
+
+  // ============ 弹窗 ============
+  function openTextEditor(){
+    document.getElementById('editTextZh').value = userTextZh;
+    document.getElementById('editSigText').value = userSigText;
+    document.getElementById('editSigDate').value = userSigDate;
+    document.getElementById('textModal').classList.add('active');
+    setTimeout(() => document.getElementById('editTextZh').focus(), 100);
+  }
+  function closeTextEditor(){ document.getElementById('textModal').classList.remove('active'); }
+  function confirmText(){
+    userTextZh = document.getElementById('editTextZh').value;
+    userSigText = document.getElementById('editSigText').value;
+    userSigDate = document.getElementById('editSigDate').value;
+    closeTextEditor();
+    redraw();
+    showToast('✅ 文字已更新');
+  }
+
+  // ============ 生成图片 ============
+  function generateImage(){
+    if (!bgLoaded || !bgImage) {
+      showToast('⏳ 背景图还没准备好');
+      return;
+    }
+    const out = document.createElement('canvas');
+    out.width = W; out.height = H;
+    const octx = out.getContext('2d');
+    drawAll(octx, true);
+    const link = document.createElement('a');
+    link.download = `鼓励贴_${currentTemplate.name}_${Date.now()}.png`;
+    link.href = out.toDataURL('image/png');
+    link.click();
+    showToast('✅ 图片已生成并下载！');
+  }
+
+  function togglePreview(){
+    previewMode = !previewMode;
+    document.getElementById('previewBar').classList.toggle('active', previewMode);
+    redraw();
+  }
+
+  function showToast(msg){
+    const t = document.getElementById('toast');
+    if (!t) return;
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') {
+      previewMode = false;
+      const bar = document.getElementById('previewBar');
+      if (bar) bar.classList.remove('active');
+      redraw();
+    }
+  });
+
+  window.openTextEditor = openTextEditor;
+  window.closeTextEditor = closeTextEditor;
+  window.confirmText = confirmText;
+  window.generateImage = generateImage;
+  window.togglePreview = togglePreview;
+
+  init();
+})();
+</script>
